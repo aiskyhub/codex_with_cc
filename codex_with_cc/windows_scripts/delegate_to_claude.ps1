@@ -144,7 +144,7 @@ $testsText = if ($Tests.Count -gt 0) {
 
 $workerProtocolText = @"
 - This prompt is already the only allowed Claude worker context for this delegated run.
-- Never call `docs/codex_with_cc/scripts/delegate_to_claude.ps1`, `claude`, or `spawn_agent` recursively from inside this worker.
+- Never call `docs/codex_with_cc/windows_scripts/delegate_to_claude.ps1`, `claude`, or `spawn_agent` recursively from inside this worker.
 - Treat `docs/codex_with_cc/CODEX_WITH_CC.md` as the workflow contract to inspect when the task scope requires it, not as an execution recipe for this worker.
 - If the task is an audit or validation, inspect the scoped files and run the listed verification commands directly instead of creating nested delegate runs.
 - If you think another delegate run is required, stop and explain why in `Final Result` instead of invoking it yourself.

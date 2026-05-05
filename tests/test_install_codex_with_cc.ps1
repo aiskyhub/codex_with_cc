@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-. (Join-Path $repoRoot 'codex_with_cc\scripts\test_helpers.ps1')
+. (Join-Path $repoRoot 'codex_with_cc\windows_scripts\test_helpers.ps1')
 
 $installerPath = Join-Path $repoRoot 'install_codex_with_cc.ps1'
 $sourceWorkflowRoot = Join-Path $repoRoot 'codex_with_cc'
@@ -40,8 +40,10 @@ Keep this project-specific rule.
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'CLAUDE_CODE_DELEGATION.md'))) -Name 'delegation-doc-not-created'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'HOST_PROJECT_RULES.md'))) -Name 'host-rules-not-created'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'PROJECT_MEMORY.md'))) -Name 'project-memory-not-created'
-  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $workflowRoot 'scripts\delegate_to_claude.ps1')) -Name 'delegate-script-created'
-  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $workflowRoot 'scripts\verify_delegate_chain.ps1')) -Name 'chain-verifier-created'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $workflowRoot 'windows_scripts\delegate_to_claude.ps1')) -Name 'delegate-script-created'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $workflowRoot 'windows_scripts\verify_delegate_chain.ps1')) -Name 'chain-verifier-created'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'scripts'))) -Name 'legacy-scripts-dir-not-created'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $workflowRoot 'macos_scripts\README.md')) -Name 'macos-placeholder-created'
   Assert-True -Condition (Test-Path -LiteralPath $taskRoot) -Name 'tasks-dir-created-under-codex-root'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $taskRoot '.gitkeep'))) -Name 'tasks-gitkeep-not-created'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $targetRoot 'docs\ai'))) -Name 'legacy-docs-ai-not-created'
@@ -61,9 +63,9 @@ Keep this project-specific rule.
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $targetRoot 'GEMINI.md'))) -Name 'gemini-entrypoint-not-created'
   Assert-Contains -Text ($installOutput -join [Environment]::NewLine) -Needle 'Agent entrypoints updated: AGENTS.md' -Name 'install-output-lists-only-agents'
 
-  $delegateText = Get-Content -LiteralPath (Join-Path $workflowRoot 'scripts\delegate_to_claude.ps1') -Raw
+  $delegateText = Get-Content -LiteralPath (Join-Path $workflowRoot 'windows_scripts\delegate_to_claude.ps1') -Raw
   Assert-Contains -Text $delegateText -Needle 'docs/codex_with_cc/CODEX_WITH_CC.md' -Name 'delegate-uses-central-workflow-entry'
-  Assert-Contains -Text $delegateText -Needle 'docs/codex_with_cc/scripts/delegate_to_claude.ps1' -Name 'delegate-prompt-uses-central-script-path'
+  Assert-Contains -Text $delegateText -Needle 'docs/codex_with_cc/windows_scripts/delegate_to_claude.ps1' -Name 'delegate-prompt-uses-central-script-path'
   Assert-NotContains -Text $delegateText -Needle 'docs/codex_with_cc/CLAUDE_CODE_DELEGATION.md' -Name 'delegate-does-not-use-delegation-sidecar-doc'
   Assert-NotContains -Text $delegateText -Needle 'docs/codex_with_cc/PROJECT_MEMORY.md' -Name 'delegate-does-not-use-central-project-memory'
   Assert-NotContains -Text $delegateText -Needle 'docs/codex_with_cc/HOST_PROJECT_RULES.md' -Name 'delegate-does-not-use-host-project-rules'
@@ -100,7 +102,7 @@ Keep this project-specific rule.
   Assert-True -Condition ($LASTEXITCODE -ne 0) -Name 'self-install-refuses-source-target-overlap'
   Assert-Contains -Text ($selfInstallOutput -join [Environment]::NewLine) -Needle 'Refusing to install codex_with_cc into its own source repository' -Name 'self-install-error-is-clear'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $selfInstallRoot 'codex_with_cc\CODEX_WITH_CC.md')) -Name 'self-install-keeps-source-workflow'
-  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $selfInstallRoot 'codex_with_cc\scripts\delegate_to_claude.ps1')) -Name 'self-install-keeps-source-scripts'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $selfInstallRoot 'codex_with_cc\windows_scripts\delegate_to_claude.ps1')) -Name 'self-install-keeps-source-scripts'
 
   Write-Host 'install tests passed' -ForegroundColor Green
 } finally {

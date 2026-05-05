@@ -318,8 +318,8 @@ try {
     '-ArtifactRoot', $tempRoot,
     '-SessionKey', 'split-scope-session-pool-test-2',
     '-SessionMode', 'PrimaryReuse',
-    '-Scope', 'docs/codex_with_cc/scripts;docs/codex_with_cc',
-    '-Tests', 'pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_session_pool.ps1;git diff --check',
+    '-Scope', 'docs/codex_with_cc/windows_scripts;docs/codex_with_cc',
+    '-Tests', 'pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1;git diff --check',
     '-DryRun'
   ) -SetChildThreadMarker
   if ($splitOutput.ExitCode -ne 0) {
@@ -327,10 +327,10 @@ try {
   }
   $splitPromptPath = (($splitOutput.Output -join [Environment]::NewLine) -split "`r?`n" | Where-Object { $_ -like 'Prompt:*' } | Select-Object -Last 1) -replace '^Prompt:\s*',''
   $splitPrompt = Get-Content -LiteralPath $splitPromptPath -Raw
-  Assert-True -Condition ($splitPrompt.Contains("- docs/codex_with_cc/scripts`r`n- docs/codex_with_cc") -or $splitPrompt.Contains("- docs/codex_with_cc/scripts`n- docs/codex_with_cc")) -Name 'semicolon-scope-splits-into-prompt-lines'
-  Assert-True -Condition ($splitPrompt.Contains("- pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_session_pool.ps1")) -Name 'semicolon-tests-first-line-present'
+  Assert-True -Condition ($splitPrompt.Contains("- docs/codex_with_cc/windows_scripts`r`n- docs/codex_with_cc") -or $splitPrompt.Contains("- docs/codex_with_cc/windows_scripts`n- docs/codex_with_cc")) -Name 'semicolon-scope-splits-into-prompt-lines'
+  Assert-True -Condition ($splitPrompt.Contains("- pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1")) -Name 'semicolon-tests-first-line-present'
   Assert-True -Condition ($splitPrompt.Contains("- git diff --check")) -Name 'semicolon-tests-second-line-present'
-  Assert-True -Condition ($splitPrompt.Contains('Never call docs/codex_with_cc/scripts/delegate_to_claude.ps1, claude, or spawn_agent recursively')) -Name 'prompt-explicitly-forbids-recursive-delegation'
+  Assert-True -Condition ($splitPrompt.Contains('Never call docs/codex_with_cc/windows_scripts/delegate_to_claude.ps1, claude, or spawn_agent recursively')) -Name 'prompt-explicitly-forbids-recursive-delegation'
   Assert-True -Condition (-not $splitPrompt.Contains('Recommended execution order:')) -Name 'prompt-does-not-inline-full-delegation-playbook'
 
   $chainArtifactRoot = Join-Path $tempRoot 'chain-artifacts'

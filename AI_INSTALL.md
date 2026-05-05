@@ -36,7 +36,7 @@
 补充约束：
 
 - 这套工作流默认是独立层，不需要为了当前项目再发明一份特化版安装文档。
-- 一旦目标项目接入这套工作流，后续凡是需要子代理/子线程继续执行的任务，都必须强制走本仓库定义的自定义委派链路：`Codex 主线程 -> Codex 子代理 -> docs/codex_with_cc/scripts/delegate_to_claude.* -> Claude Code CLI`。
+- 一旦目标项目接入这套工作流，后续凡是需要子代理/子线程继续执行的任务，都必须强制走本仓库定义的自定义委派链路：`Codex 主线程 -> Codex 子代理 -> docs/codex_with_cc/windows_scripts/delegate_to_claude.* -> Claude Code CLI`。
 - 不要把 Codex 自带的默认子代理工作流、宿主环境内置代理流程，或者“直接让当前 AI 自己继续开子代理干活”当作这套链路的等价替代。
 - 不要追问“要保留上游原样接入，还是顺手按当前项目定制”这类范围选择题。
 - 如果用户没有明确提出项目定制诉求，就保持上游文件原样接入，再在最终汇报里说明哪些验证受当前平台或本机环境限制。
@@ -73,7 +73,7 @@
 ```text
 install_codex_with_cc.ps1
 codex_with_cc/CODEX_WITH_CC.md
-codex_with_cc/scripts/delegate_to_claude.ps1
+codex_with_cc/windows_scripts/delegate_to_claude.ps1
 ```
 
 4. 将 `docs/codex_with_cc` 安装到目标项目的：
@@ -119,8 +119,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -Targe
 1. 直接执行安装脚本。
 2. 直接更新 `AGENTS.md`。
 3. 直接运行：
-   - `pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_runtime.ps1`
-   - `pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_session_pool.ps1`
+   - `pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_runtime.ps1`
+   - `pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1`
 4. 最后再向用户汇报结果。
 
 不要在 Windows 安装前额外追问“是否覆盖旧工作流”“是否需要验证”“是否需要改 AGENTS.md”；这些都已经有默认答案。
@@ -134,14 +134,16 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -Targe
 Windows 验证命令，在目标项目根目录执行：
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_runtime.ps1
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_session_pool.ps1
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\run_real_delegate_chain_validation.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_runtime.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\run_real_delegate_chain_validation.ps1
 ```
 
 ## macOS 安装
 
 macOS 不要照抄 Windows PowerShell 命令给用户。应该把工作流迁移成 macOS 原生命令。
+
+macOS 支持尚未实现；需要由安装 AI 参考 `docs/codex_with_cc/windows_scripts` 的行为自行迁移到 `docs/codex_with_cc/macos_scripts`。
 
 执行原则：
 
@@ -174,7 +176,7 @@ Windows 模板中的子代理标准调用形态：
 
 ```powershell
 $env:CODEX_CLAUDE_CHILD_THREAD = '1'
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\delegate_to_claude.ps1 `
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\delegate_to_claude.ps1 `
   -TaskFile .\.codex\codex_with_cc\tasks\<yyyyMMdd>\<HHmmssfff>-<short-id>-<task-file>.md `
   -SessionMode PrimaryReuse `
   -SessionKey <stable-session-key> `
@@ -209,13 +211,13 @@ pwsh -NoProfile -File .\docs\codex_with_cc\scripts\delegate_to_claude.ps1 `
 Windows 模板里，检查单次委派产物：
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\verify_delegate_artifacts.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\verify_delegate_artifacts.ps1
 ```
 
 Windows 模板里，检查多轮链路连续性：
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\verify_delegate_chain.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\verify_delegate_chain.ps1
 ```
 
 ## 安装完成后回复用户

@@ -7,7 +7,7 @@ This document is the portable entry point for the Codex -> Codex child agent -> 
 
 ## Core Contract
 1. The Codex main thread must not run `claude` directly.
-2. The Codex main thread must not run `docs/codex_with_cc/scripts/delegate_to_claude.ps1` directly.
+2. The Codex main thread must not run `docs/codex_with_cc/windows_scripts/delegate_to_claude.ps1` directly.
 3. Every Claude Code delegation must be carried by a Codex `spawn_agent` child thread.
 4. The child thread must set `CODEX_CLAUDE_CHILD_THREAD=1` before invoking `delegate_to_claude.ps1`.
 5. The child thread should use `model: gpt-5.3-codex`, `reasoning_effort: medium`, and `fork_context: false`.
@@ -58,7 +58,7 @@ Run this only inside a Codex child thread:
 
 ```powershell
 $env:CODEX_CLAUDE_CHILD_THREAD = '1'
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\delegate_to_claude.ps1 `
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\delegate_to_claude.ps1 `
   -TaskFile .\.codex\codex_with_cc\tasks\<yyyyMMdd>\<HHmmssfff>-<short-id>-<task-file>.md `
   -SessionMode PrimaryReuse `
   -SessionKey <stable-session-key> `
@@ -71,12 +71,12 @@ Use `PrimaryAnchor -AllowParallel` for the main branch of a parallel batch and `
 Run the local regression tests after installing or changing this workflow:
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_runtime.ps1
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\test_delegate_session_pool.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_runtime.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1
 ```
 
 Generate a real chain validation scaffold with:
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\scripts\run_real_delegate_chain_validation.ps1
+pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\run_real_delegate_chain_validation.ps1
 ```
