@@ -82,6 +82,29 @@ exit /b 0
 '@ -Encoding ASCII
 
   $originalPath = [Environment]::GetEnvironmentVariable('PATH', 'Process')
+  $docLayoutRepoRoot = Join-Path $tempRoot 'doc-layout-host'
+  $docLayoutWorkflowRoot = Join-Path $docLayoutRepoRoot 'doc\codex_with_cc'
+  New-Item -ItemType Directory -Path (Split-Path -Parent $docLayoutWorkflowRoot) -Force | Out-Null
+  Copy-Item -LiteralPath (Resolve-Path (Join-Path $PSScriptRoot '..')).Path -Destination $docLayoutWorkflowRoot -Recurse -Force
+  try {
+    [Environment]::SetEnvironmentVariable('PATH', "$fakeClaudeBin$([IO.Path]::PathSeparator)$originalPath", 'Process')
+    $docLayoutDryRun = Invoke-DelegateWorkerScript -ArgumentList @(
+      '-Task', 'doc layout repo root probe',
+      '-SessionKey', 'doc-layout-probe',
+      '-SessionMode', 'PrimaryReuse',
+      '-DryRun'
+    ) -SetChildThreadMarker -ScriptPath (Join-Path $docLayoutWorkflowRoot 'windows_scripts\delegate_to_claude.ps1')
+  } finally {
+    [Environment]::SetEnvironmentVariable('PATH', $originalPath, 'Process')
+  }
+  if ($docLayoutDryRun.ExitCode -ne 0) {
+    throw "doc-layout delegate dry run failed unexpectedly.`n$($docLayoutDryRun.Output -join [Environment]::NewLine)"
+  }
+  $docLayoutArtifactRoot = Join-Path $docLayoutRepoRoot '.codex\codex_with_cc\claude-delegate'
+  $docLayoutConfig = Get-Content -LiteralPath ((Get-ChildItem -LiteralPath $docLayoutArtifactRoot -Filter 'config_*.json' | Select-Object -First 1).FullName) -Raw | ConvertFrom-Json
+  Assert-Equal -Actual ([string]$docLayoutConfig.repoRoot) -Expected $docLayoutRepoRoot -Name 'doc-layout-delegate-resolves-repo-root-above-doc'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $docLayoutRepoRoot 'doc\.codex'))) -Name 'doc-layout-delegate-does-not-place-artifacts-under-doc-root'
+
   $lockContentionArtifactRoot = Join-Path $tempRoot 'lock-contention-run'
   New-Item -ItemType Directory -Path $lockContentionArtifactRoot -Force | Out-Null
   $heldDelegateLockPath = Join-Path $lockContentionArtifactRoot 'delegate.lock'

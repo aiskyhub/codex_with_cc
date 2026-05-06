@@ -41,7 +41,8 @@ $requiredChildThreadMarkerValue = '1'
 
 $workflowRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $workflowContainer = Split-Path -Parent $workflowRoot
-if ((Split-Path -Leaf $workflowContainer) -eq 'docs') {
+$workflowContainerName = Split-Path -Leaf $workflowContainer
+if ($workflowContainerName -eq 'docs' -or $workflowContainerName -eq 'doc') {
   $repoRoot = (Resolve-Path (Join-Path $workflowContainer '..')).Path
 } else {
   $repoRoot = $workflowContainer

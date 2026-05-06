@@ -5,7 +5,7 @@
 只要用户是在让你“安装 / 集成 / 更新这套工作流”，默认进入零打扰安装模式：
 
 1. 直接执行，不要先把安装过程变成问答游戏。
-2. 默认允许你创建或覆盖目标项目里的 `docs/codex_with_cc`。
+2. 默认允许你按安装目录选择规则创建或覆盖目标项目里的 `<workflow-root>`。
 3. 默认允许你更新目标项目根目录的 `AGENTS.md`；只有用户明确说“不改 AGENTS.md”时才跳过。
 4. 默认允许你运行当前平台可用的本地验证；不要先问“要不要跑验证”。
 5. 默认当前工作目录就是目标项目根目录；如果能从上下文或工作区直接判断，就不要为此提问。
@@ -15,9 +15,9 @@
 
 下面这些问题，默认不要问：
 
-- “要不要创建 `docs/codex_with_cc`？”
+- “要不要创建 `<workflow-root>`？”
 - “要不要修改 `AGENTS.md`？”
-- “要不要保留旧的 `docs/codex_with_cc` 内容？”
+- “要不要保留旧的 `<workflow-root>` 内容？”
 - “要不要顺手跑验证脚本？”
 - “你是想安装还是更新？”
 - “要不要我先给你一个计划？”
@@ -36,7 +36,7 @@
 补充约束：
 
 - 这套工作流默认是独立层，不需要为了当前项目再发明一份特化版安装文档。
-- 一旦目标项目接入这套工作流，后续凡是需要子代理/子线程继续执行的任务，都必须强制走本仓库定义的自定义委派链路：`Codex 主线程 -> Codex 子代理 -> docs/codex_with_cc/windows_scripts/delegate_to_claude.* -> Claude Code CLI`。
+- 一旦目标项目接入这套工作流，后续凡是需要子代理/子线程继续执行的任务，都必须强制走本仓库定义的自定义委派链路：`Codex 主线程 -> Codex 子代理 -> <workflow-root>/windows_scripts/delegate_to_claude.* -> Claude Code CLI`。
 - 不要把 Codex 自带的默认子代理工作流、宿主环境内置代理流程，或者“直接让当前 AI 自己继续开子代理干活”当作这套链路的等价替代。
 - 如果 Codex 沙箱或代跑环境无法执行同一委派命令，Codex 应改由受信任本机终端运行同一命令，并保留相同的 `CODEX_CLAUDE_CHILD_THREAD=1`、`TaskFile`、Session 参数、ArtifactRoot 和权限参数。
 - 不要追问“要保留上游原样接入，还是顺手按当前项目定制”这类范围选择题。
@@ -47,7 +47,7 @@
 
 把本仓库的 `Codex -> Codex 子代理 -> Claude Code CLI` 委派工作流集成到目标项目，使目标项目获得：
 
-- `docs/codex_with_cc` 工作流文档和脚本。
+- `<workflow-root>` 工作流文档和脚本。
 - `AGENTS.md` 的入口提示。
 - 主 Codex 线程负责规划、调度、审核。
 - Codex 子代理负责调用 Claude Code 委派脚本。
@@ -80,13 +80,13 @@ codex_with_cc/CODEX_WITH_CC.md
 codex_with_cc/windows_scripts/delegate_to_claude.ps1
 ```
 
-4. 将 `docs/codex_with_cc` 安装到目标项目的：
+4. 按目标项目根目录直属文档目录选择工作流安装位置。
 
 ```text
-docs/codex_with_cc
+安装目录选择规则：目标项目根目录同时存在 `docs` 和 `doc` 时使用 `docs/codex_with_cc`；只有 `doc` 时使用 `doc/codex_with_cc`；两者都没有时创建并使用 `docs/codex_with_cc`。
 ```
 
-安装脚本还应确保 `.codex/codex_with_cc/tasks` 存在，用于放委派任务文件；实际任务文件应按 `.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md` 创建，避免同一天多个会话或多个子代理任务使用固定文件名互相覆盖；不要再把任务文件放进 `docs/codex_with_cc` 这种会进版本库的目录里，也不要再依赖 `.gitkeep` 之类的占位文件。
+安装脚本还应确保 `.codex/codex_with_cc/tasks` 存在，用于放委派任务文件；实际任务文件应按 `.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md` 创建，避免同一天多个会话或多个子代理任务使用固定文件名互相覆盖；不要再把任务文件放进 `<workflow-root>` 这种会进版本库的目录里，也不要再依赖 `.gitkeep` 之类的占位文件。
 同时应确保目标项目的 `.gitignore` 包含 `.codex/codex_with_cc`，避免本工作流的委派任务和运行产物被误提交，同时不影响目标项目 `.codex` 下其他共用内容。
 
 5. 更新目标项目根目录的 `AGENTS.md`。没有就创建，有就追加托管块，不要删旧内容。除非用户明确禁止，否则不要为这一步单独征求确认。
@@ -95,7 +95,7 @@ docs/codex_with_cc
 
 ```markdown
 <!-- BEGIN CODEX_WITH_CC -->
-Codex with Claude Code workflow: before using this workflow, read `docs/codex_with_cc/CODEX_WITH_CC.md`.
+Codex with Claude Code workflow: before using this workflow, read `<workflow-root>/CODEX_WITH_CC.md`.
 If the task involves child agents, subagents, delegation, or any worker-execution step, you must read that file first and follow the custom `Codex main thread -> Codex child agent -> delegate_to_claude.* -> Claude Code CLI` workflow defined there.
 <!-- END CODEX_WITH_CC -->
 ```
@@ -116,15 +116,15 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -Targe
 
 安装器不支持把源仓库自身作为 `-TargetRoot`；请使用外部目标项目目录，避免安装时移除源工作流目录。
 
-如果目标项目已经装过，直接再次执行同一条命令即可。安装脚本默认会先删除旧的 `docs/codex_with_cc` 再重装，避免已经废弃的文档、脚本或占位文件残留在目标项目里。
+如果目标项目已经装过，直接再次执行同一条命令即可。安装脚本默认会先清理旧的 `docs/codex_with_cc` 和 `doc/codex_with_cc`，再按当前目录选择规则重装，避免已经废弃的文档、脚本或占位文件残留在目标项目里。
 
 如果用户没有额外限制，Windows 下默认动作应该是：
 
 1. 直接执行安装脚本。
 2. 直接更新 `AGENTS.md`。
 3. 直接运行：
-   - `pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_runtime.ps1`
-   - `pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1`
+   - `pwsh -NoProfile -File .\<workflow-root>\windows_scripts\test_delegate_runtime.ps1`
+   - `pwsh -NoProfile -File .\<workflow-root>\windows_scripts\test_delegate_session_pool.ps1`
 4. 最后再向用户汇报结果。
 
 不要在 Windows 安装前额外追问“是否覆盖旧工作流”“是否需要验证”“是否需要改 AGENTS.md”；这些都已经有默认答案。
@@ -138,16 +138,16 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -Targe
 Windows 验证命令，在目标项目根目录执行：
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_runtime.ps1
-pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session_pool.ps1
-pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\run_real_delegate_chain_validation.ps1
+pwsh -NoProfile -File .\<workflow-root>\windows_scripts\test_delegate_runtime.ps1
+pwsh -NoProfile -File .\<workflow-root>\windows_scripts\test_delegate_session_pool.ps1
+pwsh -NoProfile -File .\<workflow-root>\windows_scripts\run_real_delegate_chain_validation.ps1
 ```
 
 ## macOS 安装
 
 macOS 不要照抄 Windows PowerShell 命令给用户。应该把工作流迁移成 macOS 原生命令。
 
-macOS 支持尚未实现；需要由安装 AI 参考源仓库里的 `codex_with_cc/windows_scripts` 行为，自行迁移为目标项目 `docs/codex_with_cc/macos_scripts` 下的原生 macOS 脚本。
+macOS 支持尚未实现；需要由安装 AI 参考源仓库里的 `codex_with_cc/windows_scripts` 行为，自行迁移为目标项目 `<workflow-root>/macos_scripts` 下的原生 macOS 脚本。
 
 执行原则：
 
@@ -159,7 +159,7 @@ macOS 支持尚未实现；需要由安装 AI 参考源仓库里的 `codex_with_
 
 建议动作：
 
-1. 复制 `docs/codex_with_cc` 到目标项目的 `docs/codex_with_cc`。
+1. 复制源仓库的 `codex_with_cc` 到目标项目按规则选出的 `<workflow-root>`。
 2. 将需要在 macOS 运行的 `.ps1` 脚本迁移为等价 `.sh` 脚本。
 3. 更新文档里的命令示例，让 macOS 项目引用 `.sh` 入口。
 4. 确认委派脚本仍然只能由 Codex 子代理调用。
@@ -180,7 +180,7 @@ Windows 模板中的子代理标准调用形态：
 
 ```powershell
 $env:CODEX_CLAUDE_CHILD_THREAD = '1'
-pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\delegate_to_claude.ps1 `
+pwsh -NoProfile -File .\<workflow-root>\windows_scripts\delegate_to_claude.ps1 `
   -TaskFile .\.codex\codex_with_cc\tasks\<yyyyMMdd>\<HHmmssfff>-<short-id>-<task-file>.md `
   -SessionMode PrimaryReuse `
   -SessionKey <stable-session-key> `
@@ -215,13 +215,13 @@ pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\delegate_to_claude.ps
 Windows 模板里，检查单次委派产物：
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\verify_delegate_artifacts.ps1
+pwsh -NoProfile -File .\<workflow-root>\windows_scripts\verify_delegate_artifacts.ps1
 ```
 
 Windows 模板里，检查多轮链路连续性：
 
 ```powershell
-pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\verify_delegate_chain.ps1
+pwsh -NoProfile -File .\<workflow-root>\windows_scripts\verify_delegate_chain.ps1
 ```
 
 ## 安装完成后回复用户

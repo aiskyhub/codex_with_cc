@@ -78,6 +78,10 @@ Keep this project-specific rule.
   Set-Content -LiteralPath (Join-Path $workflowRoot 'obsolete.txt') -Value 'stale' -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $workflowRoot 'HOST_PROJECT_RULES.md') -Value 'stale host rules' -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $workflowRoot 'PROJECT_MEMORY.md') -Value 'stale project memory' -Encoding UTF8
+  $staleDocWorkflowRoot = Join-Path $targetRoot 'doc\codex_with_cc'
+  New-Item -ItemType Directory -Path $staleDocWorkflowRoot -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $staleDocWorkflowRoot 'obsolete.txt') -Value 'stale doc workflow' -Encoding UTF8
+  Set-Content -LiteralPath (Join-Path $targetRoot 'doc\keep.md') -Value 'keep doc content' -Encoding UTF8
   New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
   Set-Content -LiteralPath (Join-Path $taskRoot '.gitkeep') -Value '' -Encoding UTF8
 
@@ -92,8 +96,44 @@ Keep this project-specific rule.
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'obsolete.txt'))) -Name 'reinstall-removes-obsolete-file'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'HOST_PROJECT_RULES.md'))) -Name 'reinstall-removes-stale-host-rules'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $workflowRoot 'PROJECT_MEMORY.md'))) -Name 'reinstall-removes-stale-project-memory'
+  Assert-True -Condition (-not (Test-Path -LiteralPath $staleDocWorkflowRoot)) -Name 'reinstall-removes-stale-doc-workflow'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $targetRoot 'doc\keep.md')) -Name 'reinstall-preserves-doc-sibling-content'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $taskRoot '.gitkeep'))) -Name 'reinstall-removes-stale-gitkeep'
   Assert-True -Condition (Test-Path -LiteralPath $taskRoot) -Name 'reinstall-recreates-tasks-dir'
+
+  $docOnlyTargetRoot = Join-Path $tempRoot 'doc-only-host-project'
+  New-Item -ItemType Directory -Path (Join-Path $docOnlyTargetRoot 'doc') -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $docOnlyTargetRoot 'AGENTS.md') -Value '# Doc Only Host' -Encoding UTF8
+  $docOnlyInstallOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $installerPath -TargetRoot $docOnlyTargetRoot -Platform Windows 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    throw "doc-only installer failed unexpectedly.`n$($docOnlyInstallOutput -join [Environment]::NewLine)"
+  }
+  $docOnlyWorkflowRoot = Join-Path $docOnlyTargetRoot 'doc\codex_with_cc'
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $docOnlyWorkflowRoot 'CODEX_WITH_CC.md')) -Name 'doc-only-install-uses-doc-workflow-root'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $docOnlyTargetRoot 'docs'))) -Name 'doc-only-install-does-not-create-docs-root'
+  Assert-Contains -Text ($docOnlyInstallOutput -join [Environment]::NewLine) -Needle "codex_with_cc installed into: $docOnlyWorkflowRoot" -Name 'doc-only-output-uses-doc-workflow-root'
+  Assert-Contains -Text ($docOnlyInstallOutput -join [Environment]::NewLine) -Needle 'Next: read doc/codex_with_cc/CODEX_WITH_CC.md' -Name 'doc-only-next-step-uses-doc-relative-path'
+  $docOnlyAgentsText = Get-Content -LiteralPath (Join-Path $docOnlyTargetRoot 'AGENTS.md') -Raw
+  Assert-Contains -Text $docOnlyAgentsText -Needle 'doc/codex_with_cc/CODEX_WITH_CC.md' -Name 'doc-only-agents-block-points-to-doc-entry'
+  $docOnlyDelegateText = Get-Content -LiteralPath (Join-Path $docOnlyWorkflowRoot 'windows_scripts\delegate_to_claude.ps1') -Raw
+  Assert-Contains -Text $docOnlyDelegateText -Needle 'doc/codex_with_cc/CODEX_WITH_CC.md' -Name 'doc-only-delegate-prompt-uses-doc-entry'
+
+  $bothDocsTargetRoot = Join-Path $tempRoot 'both-docs-host-project'
+  New-Item -ItemType Directory -Path (Join-Path $bothDocsTargetRoot 'docs') -Force | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $bothDocsTargetRoot 'doc') -Force | Out-Null
+  $bothDocsInstallOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $installerPath -TargetRoot $bothDocsTargetRoot -Platform Windows -SkipAgentEntrypoints 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    throw "both-docs installer failed unexpectedly.`n$($bothDocsInstallOutput -join [Environment]::NewLine)"
+  }
+  Assert-True -Condition (Test-Path -LiteralPath (Join-Path $bothDocsTargetRoot 'docs\codex_with_cc\CODEX_WITH_CC.md')) -Name 'both-docs-install-prefers-docs-root'
+  Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $bothDocsTargetRoot 'doc\codex_with_cc'))) -Name 'both-docs-install-does-not-install-into-doc-root'
+
+  $docsFileTargetRoot = Join-Path $tempRoot 'docs-file-host-project'
+  New-Item -ItemType Directory -Path $docsFileTargetRoot -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $docsFileTargetRoot 'docs') -Value 'not a directory' -Encoding UTF8
+  $docsFileInstallOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $installerPath -TargetRoot $docsFileTargetRoot -Platform Windows -SkipAgentEntrypoints 2>&1
+  Assert-True -Condition ($LASTEXITCODE -ne 0) -Name 'docs-file-target-fails'
+  Assert-Contains -Text ($docsFileInstallOutput -join [Environment]::NewLine) -Needle 'Install document path is not a directory' -Name 'docs-file-target-error-is-clear'
 
   $selfInstallRoot = Join-Path $tempRoot 'self-install-source'
   New-Item -ItemType Directory -Path $selfInstallRoot -Force | Out-Null
@@ -106,12 +146,12 @@ Keep this project-specific rule.
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $selfInstallRoot 'codex_with_cc\windows_scripts\delegate_to_claude.ps1')) -Name 'self-install-keeps-source-scripts'
 
   $macTargetRoot = Join-Path $tempRoot 'mac-host-project'
-  New-Item -ItemType Directory -Path $macTargetRoot -Force | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $macTargetRoot 'doc') -Force | Out-Null
   $macInstallOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $installerPath -TargetRoot $macTargetRoot -Platform macOS -SkipAgentEntrypoints 2>&1
   if ($LASTEXITCODE -ne 0) {
     throw "mac installer failed unexpectedly.`n$($macInstallOutput -join [Environment]::NewLine)"
   }
-  $macWorkflowRoot = Join-Path $macTargetRoot 'docs\codex_with_cc'
+  $macWorkflowRoot = Join-Path $macTargetRoot 'doc\codex_with_cc'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $macWorkflowRoot 'CODEX_WITH_CC.md')) -Name 'mac-install-copies-workflow-doc'
   Assert-True -Condition (Test-Path -LiteralPath (Join-Path $macWorkflowRoot 'macos_scripts\README.md')) -Name 'mac-install-copies-macos-scripts'
   Assert-True -Condition (-not (Test-Path -LiteralPath (Join-Path $macWorkflowRoot 'windows_scripts'))) -Name 'mac-install-does-not-copy-windows-scripts'

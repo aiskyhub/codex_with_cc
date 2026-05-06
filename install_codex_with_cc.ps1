@@ -47,16 +47,42 @@ function Resolve-InstallPlatform {
   throw 'Unsupported install platform. Pass -Platform Windows or -Platform macOS explicitly.'
 }
 
-function Update-AgentEntrypoint {
+function Test-InstallDocumentDirectory {
   param(
     [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return $false
+  }
+
+  $item = Get-Item -LiteralPath $Path -Force
+  if (-not $item.PSIsContainer) {
+    throw "Install document path is not a directory: $Path"
+  }
+
+  return $true
+}
+
+function Get-WorkflowRelativePath {
+  param(
+    [Parameter(Mandatory = $true)][string]$DocumentRoot
+  )
+
+  return ('{0}/codex_with_cc' -f (Split-Path -Leaf $DocumentRoot))
+}
+
+function Update-AgentEntrypoint {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$WorkflowRelativePath
   )
 
   $begin = '<!-- BEGIN CODEX_WITH_CC -->'
   $end = '<!-- END CODEX_WITH_CC -->'
   $block = @(
     $begin
-    'Codex with Claude Code workflow: before using this workflow, read `docs/codex_with_cc/CODEX_WITH_CC.md`.'
+    "Codex with Claude Code workflow: before using this workflow, read ``$WorkflowRelativePath/CODEX_WITH_CC.md``."
     'If the task involves child agents, subagents, delegation, or any worker-execution step, you must read that file first and follow the custom `Codex main thread -> Codex child agent -> delegate_to_claude.* -> Claude Code CLI` workflow defined there.'
     $end
   ) -join [Environment]::NewLine
@@ -74,6 +100,33 @@ function Update-AgentEntrypoint {
   }
 
   [System.IO.File]::WriteAllText($Path, $updated, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Update-InstalledWorkflowReferences {
+  param(
+    [Parameter(Mandatory = $true)][string]$WorkflowRoot,
+    [Parameter(Mandatory = $true)][string]$WorkflowRelativePath
+  )
+
+  $canonicalRelativePath = 'docs/codex_with_cc'
+  if ($WorkflowRelativePath -eq $canonicalRelativePath) {
+    return
+  }
+
+  $canonicalWindowsPath = $canonicalRelativePath.Replace('/', '\')
+  $workflowWindowsPath = $WorkflowRelativePath.Replace('/', '\')
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  foreach ($file in Get-ChildItem -LiteralPath $WorkflowRoot -Recurse -File -Force) {
+    if ($file.Extension -notin @('.md', '.ps1')) {
+      continue
+    }
+
+    $text = Get-Content -LiteralPath $file.FullName -Raw
+    $updated = $text.Replace($canonicalRelativePath, $WorkflowRelativePath).Replace($canonicalWindowsPath, $workflowWindowsPath)
+    if ($updated -ne $text) {
+      [System.IO.File]::WriteAllText($file.FullName, $updated, $utf8NoBom)
+    }
+  }
 }
 
 function Update-GitIgnore {
@@ -129,7 +182,12 @@ if ([string]::Equals($resolvedInstallerRoot, $resolvedTargetRoot, [System.String
   throw "Refusing to install codex_with_cc into its own source repository. Choose a different -TargetRoot so the installer does not modify its source repository: $resolvedInstallerRoot"
 }
 
-$docsRoot = Join-Path $resolvedTargetRoot 'docs'
+$docsCandidateRoot = Join-Path $resolvedTargetRoot 'docs'
+$docCandidateRoot = Join-Path $resolvedTargetRoot 'doc'
+$hasDocsRoot = Test-InstallDocumentDirectory -Path $docsCandidateRoot
+$hasDocRoot = Test-InstallDocumentDirectory -Path $docCandidateRoot
+$docsRoot = if ($hasDocsRoot -or -not $hasDocRoot) { $docsCandidateRoot } else { $docCandidateRoot }
+$workflowRelativePath = Get-WorkflowRelativePath -DocumentRoot $docsRoot
 $workflowRoot = Join-Path $docsRoot 'codex_with_cc'
 $codexRoot = Join-Path $resolvedTargetRoot '.codex'
 $taskRoot = Join-Path $codexRoot 'codex_with_cc\tasks'
@@ -139,11 +197,19 @@ if ([string]::Equals($resolvedSourceWorkflowRoot, $resolvedWorkflowRoot, [System
   throw "Refusing to install codex_with_cc into its own source repository. Choose a different -TargetRoot so the installer does not remove its source workflow directory: $resolvedSourceWorkflowRoot"
 }
 
-if (Test-Path -LiteralPath $workflowRoot) {
-  if (-not (Test-PathInside -Child $workflowRoot -Parent $resolvedTargetRoot)) {
-    throw "Refusing to remove workflow directory outside target root: $workflowRoot"
+foreach ($candidateWorkflowRoot in @((Join-Path $docsCandidateRoot 'codex_with_cc'), (Join-Path $docCandidateRoot 'codex_with_cc'))) {
+  if (Test-Path -LiteralPath $candidateWorkflowRoot) {
+    if (-not (Test-PathInside -Child $candidateWorkflowRoot -Parent $resolvedTargetRoot)) {
+      throw "Refusing to remove workflow directory outside target root: $candidateWorkflowRoot"
+    }
+
+    $resolvedCandidateWorkflowRoot = [System.IO.Path]::GetFullPath($candidateWorkflowRoot)
+    if ([string]::Equals($resolvedSourceWorkflowRoot, $resolvedCandidateWorkflowRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "Refusing to install codex_with_cc into its own source repository. Choose a different -TargetRoot so the installer does not remove its source workflow directory: $resolvedSourceWorkflowRoot"
+    }
+
+    Remove-Item -LiteralPath $candidateWorkflowRoot -Recurse -Force
   }
-  Remove-Item -LiteralPath $workflowRoot -Recurse -Force
 }
 
 New-Item -ItemType Directory -Path $docsRoot -Force | Out-Null
@@ -155,6 +221,7 @@ foreach ($sourceItem in Get-ChildItem -LiteralPath $sourceWorkflowRoot -Force) {
   }
   Copy-Item -LiteralPath $sourceItem.FullName -Destination $workflowRoot -Recurse -Force
 }
+Update-InstalledWorkflowReferences -WorkflowRoot $workflowRoot -WorkflowRelativePath $workflowRelativePath
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
 $taskGitkeepPath = Join-Path $taskRoot '.gitkeep'
 if (Test-Path -LiteralPath $taskGitkeepPath) {
@@ -164,7 +231,7 @@ Update-GitIgnore -Path (Join-Path $resolvedTargetRoot '.gitignore')
 
 if (-not $SkipAgentEntrypoints) {
   foreach ($entryName in @('AGENTS.md')) {
-    Update-AgentEntrypoint -Path (Join-Path $resolvedTargetRoot $entryName)
+    Update-AgentEntrypoint -Path (Join-Path $resolvedTargetRoot $entryName) -WorkflowRelativePath $workflowRelativePath
   }
 }
 
@@ -172,4 +239,4 @@ Write-Host "codex_with_cc installed into: $workflowRoot"
 if (-not $SkipAgentEntrypoints) {
   Write-Host 'Agent entrypoints updated: AGENTS.md'
 }
-Write-Host 'Next: read docs/codex_with_cc/CODEX_WITH_CC.md and use it as the single workflow contract.'
+Write-Host "Next: read $workflowRelativePath/CODEX_WITH_CC.md and use it as the single workflow contract."
