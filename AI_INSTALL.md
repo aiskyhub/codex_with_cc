@@ -77,7 +77,9 @@
 ```text
 install_codex_with_cc.ps1
 codex_with_cc/CODEX_WITH_CC.md
-codex_with_cc/windows_scripts/delegate_to_claude.ps1
+codex_with_cc/windows_scripts/delegate_to_claude.ps1  # Windows 入口
+或
+codex_with_cc/unix_scripts/delegate_to_claude.sh     # Linux/macOS 入口
 ```
 
 4. 将 `docs/codex_with_cc` 安装到目标项目的：
@@ -147,7 +149,7 @@ pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\run_real_delegate_cha
 
 macOS 不要照抄 Windows PowerShell 命令给用户。应该把工作流迁移成 macOS 原生命令。
 
-macOS 支持尚未实现；需要由安装 AI 参考源仓库里的 `codex_with_cc/windows_scripts` 行为，自行迁移为目标项目 `docs/codex_with_cc/macos_scripts` 下的原生 macOS 脚本。
+macOS 支持尚未完整自动化；需要由安装 AI 参考源仓库里的 `codex_with_cc/unix_scripts`（或等价的 unix 脚本实现）行为，自行迁移为目标项目 `docs/codex_with_cc/macos_scripts` 下的原生 macOS 脚本。
 
 执行原则：
 
