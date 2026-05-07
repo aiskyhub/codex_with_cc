@@ -41,6 +41,8 @@ This fallback is an execution-location fallback only. Preserve the same `CODEX_C
 
 Do not replace this with the default Codex subagent flow, a direct `claude` command, or a modified worker command. Report that the trusted terminal fallback was used and include the command outcome in verification.
 
+When the delegated runner detects that the local Claude state directory is not writable, the Unix workflow may emit a repo- or `/tmp`-scoped rerun script such as `rerun_<RunId>.sh` under the delegate artifact root. That script is the preferred trusted-local-terminal handoff because it preserves the same task file, session mode, session key, artifact root, and permission flags.
+
 ## Delegation Failure Contract
 When the delegate script fails, the Codex main thread must observe the following failure contract:
 
@@ -88,6 +90,8 @@ Delegation artifacts are written under `.codex/codex_with_cc/claude-delegate` by
 - `stream_<RunId>.jsonl`
 - `trace_<RunId>.log`
 - `session-pools/<SessionKey>.json`
+
+If the repository-local artifact root is not writable, the Unix workflow may fall back to `/tmp/codex_with_cc/<repo>/claude-delegate`.
 
 Use `verify_delegate_artifacts.ps1` (Windows) or `verify_delegate_artifacts.sh` (Linux/macOS) for each run and `verify_delegate_chain.ps1` (Windows) or `verify_delegate_chain.sh` (Linux/macOS) for multi-run continuity checks.
 

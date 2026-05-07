@@ -49,6 +49,8 @@ test_lock_timeout_rejection() {
     local tmp_root
     tmp_root=$(mktemp -d)
     local lock_path="$tmp_root/delegate.lock"
+    local tmp_home
+    tmp_home=$(mktemp -d)
     
     mkdir -p "$(dirname "$lock_path")"
     echo '{"runId":"other-run","pid":999999,"startedAt":"2025-01-01T00:00:00Z"}' > "$lock_path"
@@ -57,7 +59,7 @@ test_lock_timeout_rejection() {
     flock -x 3
     
     local result
-    result=$(CODEX_CLAUDE_CHILD_THREAD=1 timeout 5 bash "$SCRIPT_DIR/delegate_to_claude.sh" \
+    result=$(HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" CODEX_CLAUDE_CHILD_THREAD=1 timeout 5 bash "$SCRIPT_DIR/delegate_to_claude.sh" \
         -t "test task" \
         --artifact-root "$tmp_root" \
         --lock-timeout 2 \
@@ -67,8 +69,37 @@ test_lock_timeout_rejection() {
     exec 3>&-
     
     rm -rf "$tmp_root"
+    rm -rf "$tmp_home"
     
     if echo "$result" | grep -q "Another delegate_to_claude run is still active"; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+test_unwritable_claude_state_emits_rerun_script() {
+    local tmp_root
+    tmp_root=$(mktemp -d)
+    local home_parent
+    home_parent=$(mktemp -d)
+    local readonly_home="$home_parent/readonly-home"
+    mkdir -p "$readonly_home"
+    chmod 555 "$readonly_home"
+
+    local result
+    result=$(HOME="$readonly_home" CODEX_CLAUDE_CHILD_THREAD=1 bash "$SCRIPT_DIR/delegate_to_claude.sh" \
+        -t "test task" \
+        --artifact-root "$tmp_root" \
+        2>&1 || true)
+
+    local rerun_script
+    rerun_script=$(find "$tmp_root" -maxdepth 1 -name 'rerun_*.sh' | head -n 1)
+
+    chmod 755 "$readonly_home"
+    rm -rf "$home_parent" "$tmp_root"
+
+    if echo "$result" | grep -q "Trusted local terminal fallback script" && [[ -n "$rerun_script" ]]; then
         echo "true"
     else
         echo "false"
@@ -279,6 +310,7 @@ echo ""
 
 run_test "child_thread_marker_missing" test_child_thread_marker_missing
 run_test "lock_timeout_rejection" test_lock_timeout_rejection
+run_test "unwritable_claude_state_emits_rerun_script" test_unwritable_claude_state_emits_rerun_script
 run_test "unstructured_output_normalization" test_unstructured_output_normalization
 run_test "stale_session_retry_detection" test_stale_session_retry_detection
 run_test "stream_json_startup_error_retry" test_stream_json_startup_error_retry

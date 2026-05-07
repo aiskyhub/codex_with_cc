@@ -185,10 +185,34 @@ ENTRY_PATH="$WORKFLOW_ROOT/CODEX_WITH_CC.md"
 SESSION_POOL_HELPER_PATH="$SCRIPT_DIR/claude_session_pool.sh"
 BACKEND_HELPER_PATH="$SCRIPT_DIR/claude_delegate_backend_helpers.sh"
 
-if [[ -z "$ARTIFACT_ROOT" ]]; then
-    ARTIFACT_ROOT="$REPO_ROOT/.codex/codex_with_cc/claude-delegate"
-fi
-RESOLVED_ARTIFACT_ROOT="$(cd "$(dirname "$ARTIFACT_ROOT")" 2>/dev/null && pwd)/$(basename "$ARTIFACT_ROOT")" || RESOLVED_ARTIFACT_ROOT="$ARTIFACT_ROOT"
+get_default_delegate_artifact_root() {
+    local repo_root="$1"
+    local preferred="$repo_root/.codex/codex_with_cc/claude-delegate"
+    local writable
+    writable=$(test_claude_delegate_path_writable "$preferred/.artifact_probe")
+    if [[ "$writable" == "true" ]]; then
+        printf '%s\n' "$preferred"
+        return
+    fi
+
+    local repo_name
+    repo_name=$(basename "$repo_root" | sed 's/[^A-Za-z0-9_.-]/_/g')
+    printf '/tmp/codex_with_cc/%s/claude-delegate\n' "$repo_name"
+}
+
+resolve_delegate_path() {
+    local path="$1"
+    local dir
+    dir=$(dirname "$path")
+    if [[ -d "$dir" ]]; then
+        (
+            cd "$dir"
+            printf '%s/%s\n' "$(pwd -P)" "$(basename "$path")"
+        )
+    else
+        printf '%s\n' "$path"
+    fi
+}
 
 if [[ ! -f "$SESSION_POOL_HELPER_PATH" ]]; then
     echo "Missing Claude session pool helper: $SESSION_POOL_HELPER_PATH" >&2
@@ -201,6 +225,11 @@ fi
 
 source "$SESSION_POOL_HELPER_PATH"
 source "$BACKEND_HELPER_PATH"
+
+if [[ -z "$ARTIFACT_ROOT" ]]; then
+    ARTIFACT_ROOT="$(get_default_delegate_artifact_root "$REPO_ROOT")"
+fi
+RESOLVED_ARTIFACT_ROOT="$(resolve_delegate_path "$ARTIFACT_ROOT")"
 
 if [[ ! -f "$ENTRY_PATH" ]]; then
     echo "Missing workflow entry document: $ENTRY_PATH" >&2
@@ -293,6 +322,34 @@ if [[ "$writable" != "true" ]]; then
     echo "Path is not writable: $RESOLVED_OUTPUT_PATH" >&2
     exit 1
 fi
+
+TASK_SNAPSHOT_PATH="$RESOLVED_ARTIFACT_ROOT/task_${RUN_ID}.md"
+RERUN_SCRIPT_PATH="$RESOLVED_ARTIFACT_ROOT/rerun_${RUN_ID}.sh"
+
+write_delegate_task_snapshot() {
+    mkdir -p "$(dirname "$TASK_SNAPSHOT_PATH")"
+    printf '%s\n' "$TASK_TEXT" > "$TASK_SNAPSHOT_PATH"
+}
+
+shell_quote() {
+    printf '%q' "$1"
+}
+
+write_trusted_local_terminal_rerun_script() {
+    write_delegate_task_snapshot
+    mkdir -p "$(dirname "$RERUN_SCRIPT_PATH")"
+    cat > "$RERUN_SCRIPT_PATH" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+export CODEX_CLAUDE_CHILD_THREAD=1
+bash $(shell_quote "$SCRIPT_DIR/delegate_to_claude.sh") \\
+  -f $(shell_quote "$TASK_SNAPSHOT_PATH") \\
+  --session-mode $(shell_quote "$SESSION_MODE") \\
+  --session-key $(shell_quote "$EFFECTIVE_SESSION_KEY") \\
+  --artifact-root $(shell_quote "$RESOLVED_ARTIFACT_ROOT")$(if [[ "$ALLOW_PARALLEL" == "true" ]]; then printf ' \\\n  --allow-parallel'; fi)$(if [[ "$BYPASS_PERMISSIONS" == "true" ]]; then printf ' \\\n  --bypass-permissions'; fi)
+EOF
+    chmod +x "$RERUN_SCRIPT_PATH"
+}
 
 write_delegate_json() {
     local path="$1"
@@ -544,6 +601,22 @@ EOF
 EOF
 )"
 }
+
+DEFAULT_CLAUDE_STATE_DIR="${HOME:-}/.claude"
+CLAUDE_STATE_WRITABLE="true"
+if [[ -z "${HOME:-}" ]]; then
+    CLAUDE_STATE_WRITABLE="false"
+elif [[ "$(test_claude_delegate_path_writable "$DEFAULT_CLAUDE_STATE_DIR/.delegate_probe")" != "true" ]]; then
+    CLAUDE_STATE_WRITABLE="false"
+fi
+
+if [[ "$CLAUDE_STATE_WRITABLE" != "true" ]]; then
+    write_trusted_local_terminal_rerun_script
+    complete_claude_delegate_startup_failure "Claude state directory is not writable in this execution environment: $DEFAULT_CLAUDE_STATE_DIR. Use the trusted local terminal fallback script: $RERUN_SCRIPT_PATH"
+    echo "Claude state directory is not writable in this execution environment: $DEFAULT_CLAUDE_STATE_DIR" >&2
+    echo "Trusted local terminal fallback script: $RERUN_SCRIPT_PATH" >&2
+    exit 1
+fi
 
 LOCK_FD=""
 cleanup_lock() {

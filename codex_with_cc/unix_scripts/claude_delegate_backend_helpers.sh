@@ -199,14 +199,21 @@ is_process_alive() {
 test_claude_delegate_path_writable() {
     local path="$1"
     local full_path
-    full_path=$(cd "$(dirname "$path")" 2>/dev/null && pwd)/$(basename "$path") || full_path="$path"
+    local parent_dir
+    parent_dir=$(dirname "$path")
+    if [[ -d "$parent_dir" ]]; then
+        full_path="$(cd "$parent_dir" 2>/dev/null && pwd)/$(basename "$path")"
+    else
+        full_path="$path"
+    fi
     local dir
     dir=$(dirname "$full_path")
 
-    mkdir -p "$dir"
+    mkdir -p "$dir" 2>/dev/null || true
 
-    local probe_path="${dir}/.write_probe_$$_$(date +%s%N).tmp"
-    if echo "ok" > "$probe_path" 2>/dev/null; then
+    local probe_path
+    probe_path=$(mktemp "$dir/.write_probe_XXXXXX" 2>/dev/null)
+    if [[ -n "$probe_path" && -f "$probe_path" ]]; then
         rm -f "$probe_path"
         echo "true"
     else
