@@ -268,9 +268,20 @@ invoke_session_state_update() {
         state=$(read_session_pool_state "$state_path" "$key")
         result=$(eval "$update_script" <<< "$state")
         if [[ -n "$result" ]]; then
-            write_session_pool_state "$state_path" "$result"
+            if echo "$result" | jq -e 'has("state") and has("result")' >/dev/null 2>&1; then
+                local next_state
+                next_state=$(echo "$result" | jq -c '.state')
+                write_session_pool_state "$state_path" "$next_state"
+                echo "$result" | jq -c '.result'
+            elif echo "$result" | jq -e 'has("primary") and has("parallelPool")' >/dev/null 2>&1; then
+                write_session_pool_state "$state_path" "$result"
+                echo "$result"
+            else
+                echo "$result"
+            fi
+        else
+            echo "$result"
         fi
-        echo "$result"
     }
     
     flock -u 3
@@ -377,11 +388,12 @@ acquire_claude_session_lease() {
                         --arg now \"\$now\" \\
                         '.primary.sessionId = \$sid | .primary.status = \"leased\" | .primary.leaseRunId = \$rid | .primary.leasePid = (\$pid | tonumber) | .primary.leasedAt = \$now')
                     
-                    echo \"\$state\" | jq -c \\
+                    jq -n \\
+                        --argjson state \"\$state\" \\
                         --arg mode '$mode' \\
                         --arg sid \"\$session_id\" \\
                         --argjson resume \"\$resume\" \\
-                        '{mode: \$mode, sessionId: \$sid, resume: \$resume, poolIndex: null, leased: true}'
+                        '{state: \$state, result: {mode: \$mode, sessionId: \$sid, resume: \$resume, poolIndex: null, leased: true}}'
                     exit 0
                 fi
                 
@@ -434,12 +446,13 @@ acquire_claude_session_lease() {
                         }')
                     state=\$(echo \"\$state\" | jq --argjson slot \"\$new_slot\" '.parallelPool += [\$slot]')
                     
-                    echo \"\$state\" | jq -c \\
+                    jq -n \\
+                        --argjson state \"\$state\" \\
                         --arg mode '$mode' \\
                         --arg sid \"\$new_session_id\" \\
                         --argjson resume false \\
                         --argjson idx \$((pool_count)) \\
-                        '{mode: \$mode, sessionId: \$sid, resume: \$resume, poolIndex: \$idx, leased: true}'
+                        '{state: \$state, result: {mode: \$mode, sessionId: \$sid, resume: \$resume, poolIndex: \$idx, leased: true}}'
                     exit 0
                 fi
                 
@@ -463,12 +476,13 @@ acquire_claude_session_lease() {
                     --arg fp '$fingerprint' \\
                     '.parallelPool[(\$idx | tonumber)].sessionId = \$sid | .parallelPool[(\$idx | tonumber)].status = \"leased\" | .parallelPool[(\$idx | tonumber)].leaseRunId = \$rid | .parallelPool[(\$idx | tonumber)].leasePid = (\$pid | tonumber) | .parallelPool[(\$idx | tonumber)].leasedAt = \$now | .parallelPool[(\$idx | tonumber)].lastTaskFingerprint = \$fp')
                 
-                echo \"\$state\" | jq -c \\
+                jq -n \\
+                    --argjson state \"\$state\" \\
                     --arg mode '$mode' \\
                     --arg sid \"\$session_id\" \\
                     --argjson resume \"\$resume\" \\
                     --argjson idx \"\$selected_index\" \\
-                    '{mode: \$mode, sessionId: \$sid, resume: \$resume, poolIndex: \$idx, leased: true}'
+                    '{state: \$state, result: {mode: \$mode, sessionId: \$sid, resume: \$resume, poolIndex: \$idx, leased: true}}'
             "
         )
         
@@ -591,10 +605,11 @@ reset_claude_session_lease_for_fresh_session() {
                 --arg old_rid '$run_id' \\
                 '.primary.sessionId = \$sid | .primary.status = \"leased\" | .primary.leaseRunId = \$rid | .primary.leasedAt = \$now | .primary.lastUsedAt = null | .primary.lastRunId = null | .primary.lastResetAt = \$now | .primary.lastResetReason = \$reason | .primary.lastResetFromSessionId = \$old_sid | .primary.lastResetFromRunId = \$old_rid')
             
-            echo \"\$state\" | jq -c \\
+            jq -n \\
+                --argjson state \"\$state\" \\
                 --arg mode \"\$mode\" \\
                 --arg sid \"\$new_session_id\" \\
-                '{mode: \$mode, sessionId: \$sid, resume: false, poolIndex: null, leased: true}'
+                '{state: \$state, result: {mode: \$mode, sessionId: \$sid, resume: false, poolIndex: null, leased: true}}'
             exit 0
         fi
         
@@ -618,11 +633,12 @@ reset_claude_session_lease_for_fresh_session() {
                         --arg old_rid '$run_id' \\
                         '.parallelPool[(\$idx | tonumber)].sessionId = \$sid | .parallelPool[(\$idx | tonumber)].status = \"leased\" | .parallelPool[(\$idx | tonumber)].leaseRunId = \$rid | .parallelPool[(\$idx | tonumber)].leasedAt = \$now | .parallelPool[(\$idx | tonumber)].lastUsedAt = null | .parallelPool[(\$idx | tonumber)].lastRunId = null | .parallelPool[(\$idx | tonumber)].lastTaskFingerprint = \$fp | .parallelPool[(\$idx | tonumber)].lastResetAt = \$now | .parallelPool[(\$idx | tonumber)].lastResetReason = \$reason | .parallelPool[(\$idx | tonumber)].lastResetFromSessionId = \$old_sid | .parallelPool[(\$idx | tonumber)].lastResetFromRunId = \$old_rid')
                     
-                    echo \"\$state\" | jq -c \\
+                    jq -n \\
+                        --argjson state \"\$state\" \\
                         --arg mode \"\$mode\" \\
                         --arg sid \"\$new_session_id\" \\
                         --argjson idx \"\$i\" \\
-                        '{mode: \$mode, sessionId: \$sid, resume: false, poolIndex: \$idx, leased: true}'
+                        '{state: \$state, result: {mode: \$mode, sessionId: \$sid, resume: false, poolIndex: \$idx, leased: true}}'
                     exit 0
                 fi
             done

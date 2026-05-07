@@ -20,9 +20,12 @@ TESTS_FAILED=0
 run_test() {
     local name="$1"
     local test_func="$2"
+    local result
     
     echo "Running test: $name"
-    if $test_func; then
+    result="$($test_func)"
+    printf '%s\n' "$result"
+    if [[ "$result" == "true" ]]; then
         echo "  PASSED: $name"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
@@ -253,9 +256,11 @@ test_json_file_atomic_write() {
     write_claude_delegate_json_file "$tmp_file" "$test_data"
     
     if [[ -f "$tmp_file" ]]; then
-        local content
-        content=$(cat "$tmp_file")
-        if [[ "$content" == "$test_data" ]]; then
+        local field
+        local number
+        field=$(jq -r '.test' "$tmp_file")
+        number=$(jq -r '.number' "$tmp_file")
+        if [[ "$field" == "value" ]] && [[ "$number" == "42" ]]; then
             rm -f "$tmp_file"
             echo "true"
         else

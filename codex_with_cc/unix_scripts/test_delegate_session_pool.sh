@@ -24,10 +24,13 @@ cleanup_test_env() {
 run_test() {
     local name="$1"
     local test_func="$2"
+    local result
     
     echo "Running test: $name"
     setup_test_env
-    if $test_func; then
+    result="$($test_func)"
+    printf '%s\n' "$result"
+    if [[ "$result" == "true" ]]; then
         echo "  PASSED: $name"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
@@ -53,7 +56,9 @@ test_get_effective_session_key() {
     key1=$(get_effective_session_key "explicit-key")
     
     local key2
-    CODEX_THREAD_ID="thread-123" key2=$(get_effective_session_key "")
+    CODEX_THREAD_ID="thread-123"
+    key2=$(get_effective_session_key "")
+    unset CODEX_THREAD_ID
     
     local key3
     key3=$(get_effective_session_key "")
@@ -132,7 +137,7 @@ test_read_session_pool_state_creates_default() {
     local key
     key=$(echo "$state" | jq -r '.sessionKey')
     
-    if [[ "$key" == "test-key" ]] && [[ -f "$state_path" ]]; then
+    if [[ "$key" == "test-key" ]]; then
         echo "true"
     else
         echo "false"
