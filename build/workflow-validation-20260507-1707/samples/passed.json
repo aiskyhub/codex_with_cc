@@ -1,0 +1,19 @@
+{
+  "tasks": [
+    {
+      "id": "lint",
+      "title": "Run linter",
+      "status": "passed"
+    },
+    {
+      "id": "test",
+      "title": "Run tests",
+      "status": "passed"
+    },
+    {
+      "id": "build",
+      "title": "Build artifacts",
+      "status": "passed"
+    }
+  ]
+}
