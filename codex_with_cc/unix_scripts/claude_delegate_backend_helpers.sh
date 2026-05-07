@@ -8,33 +8,41 @@ write_claude_delegate_json_file() {
     dir=$(dirname "$path")
     local filename
     filename=$(basename "$path")
-    local tmpfile="${dir}/.${filename}.$$.tmp"
-    
-    mkdir -p "$dir"
-        local tmpfile
-
-        mkdir -p "$dir"
-        tmpfile=$(mktemp "${dir}/.${filename}.XXXXXX")
-        echo "$data" > "$tmpfile"
-        mv "$tmpfile" "$path"
-}
-
-#!/usr/bin/env bash
-set -euo pipefail
-
-write_claude_delegate_json_file() {
-    local path="$1"
-    local data="$2"
-    local dir
-    dir=$(dirname "$path")
-    local filename
-    filename=$(basename "$path")
 
     mkdir -p "$dir"
     local tmpfile
     tmpfile=$(mktemp "${dir}/.${filename}.XXXXXX")
-    echo "$data" > "$tmpfile"
+    printf '%s' "$data" > "$tmpfile"
     mv "$tmpfile" "$path"
+}
+
+json_quote() {
+    local value="${1-}"
+    printf '%s' "$value" | jq -Rs .
+}
+
+json_quote_or_null() {
+    local value="${1-}"
+    if [[ -n "$value" ]]; then
+        json_quote "$value"
+    else
+        echo "null"
+    fi
+}
+
+json_number_or_null() {
+    local value="${1-}"
+    if [[ -z "$value" ]]; then
+        echo "null"
+        return
+    fi
+
+    if [[ "$value" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+        printf '%s' "$value"
+    else
+        echo "Invalid numeric JSON value: $value" >&2
+        return 1
+    fi
 }
 
 test_claude_delegate_text_has_final_result_heading() {
@@ -414,4 +422,3 @@ test_claude_delegate_needs_fresh_session_retry() {
         echo "false"
     fi
 }
-

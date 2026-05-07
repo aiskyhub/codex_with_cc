@@ -1,5 +1,17 @@
 # AI 安装说明
 
+## 路径语境
+
+先把路径语境分清楚，再执行安装：
+
+- **当前仓库是源仓库**，工作流文件放在 `codex_with_cc/...`
+- **安装后的宿主仓库是目标项目**，工作流文件放在 `docs/codex_with_cc/...`
+- Windows 安装入口是 `scripts/install_codex_with_cc.ps1`
+- Linux/macOS 安装入口是 `scripts/install_codex_with_cc.sh`
+- 写给目标项目的委派命令、验证命令、`AGENTS.md` 入口，一律引用 `docs/codex_with_cc/...`
+
+如果需要完整映射表，直接看 `PROJECT_STRUCTURE.md`。
+
 ## 默认交互策略（零打扰优先）
 
 只要用户是在让你“安装 / 集成 / 更新这套工作流”，默认进入零打扰安装模式：
@@ -36,12 +48,12 @@
 补充约束：
 
 - 这套工作流默认是独立层，不需要为了当前项目再发明一份特化版安装文档。
-- 一旦目标项目接入这套工作流，后续凡是需要子代理/子线程继续执行的任务，都必须强制走本仓库定义的自定义委派链路：`Codex 主线程 -> Codex 子代理 -> docs/codex_with_cc/windows_scripts/delegate_to_claude.* -> Claude Code CLI`。
+- 一旦目标项目接入这套工作流，后续凡是需要子代理/子线程继续执行的任务，都必须强制走本仓库定义的自定义委派链路：`Codex 主线程 -> Codex 子代理 -> docs/codex_with_cc/<windows_scripts|unix_scripts>/delegate_to_claude.* -> Claude Code CLI`。
 - 不要把 Codex 自带的默认子代理工作流、宿主环境内置代理流程，或者“直接让当前 AI 自己继续开子代理干活”当作这套链路的等价替代。
 - 如果 Codex 沙箱或代跑环境无法执行同一委派命令，Codex 应改由受信任本机终端运行同一命令，并保留相同的 `CODEX_CLAUDE_CHILD_THREAD=1`、`TaskFile`、Session 参数、ArtifactRoot 和权限参数。
 - 不要追问“要保留上游原样接入，还是顺手按当前项目定制”这类范围选择题。
 - 如果用户没有明确提出项目定制诉求，就保持上游文件原样接入，再在最终汇报里说明哪些验证受当前平台或本机环境限制。
-- Windows 目标项目不要安装 `macos_scripts`；macOS 目标项目不要安装 `windows_scripts`。
+- Windows 目标项目不要安装 `unix_scripts`；Linux/macOS 目标项目不要安装 `windows_scripts`。
 
 ## 目标
 
@@ -68,25 +80,33 @@
 ## 推荐安装流程
 
 1. 优先把当前工作目录直接视为目标项目根目录；只有在根目录确实无法判断时才提问。
-2. 拉取或读取源仓库：`https://github.com/xdd666t/codex_with_cc`。
+2. 拉取或读取源仓库：`https://github.com/kevin0201z/codex_with_cc.git`。
    - 如果你已经在本仓库本地工作区内，可以直接使用当前工作区作为源仓库。
    - 如果只能通过 GitHub URL 拉取，先确认远程仓库不是空仓库，并且能读到下面列出的必需文件。
    - 如果远程仓库没有分支引用、克隆后为空，或缺少必需文件，停止安装并告诉用户“源仓库尚未发布或内容不完整”，不要编造安装成功。
 3. 检查源仓库里是否存在：
 
 ```text
-install_codex_with_cc.ps1
-codex_with_cc/CODEX_WITH_CC.md
-codex_with_cc/windows_scripts/delegate_to_claude.ps1  # Windows 入口
+scripts/install_codex_with_cc.ps1  # Windows 安装器
 或
-codex_with_cc/unix_scripts/delegate_to_claude.sh     # Linux/macOS 入口
+scripts/install_codex_with_cc.sh   # Linux/macOS 安装器
+codex_with_cc/CODEX_WITH_CC.md
+codex_with_cc/windows_scripts/delegate_to_claude.ps1  # 源仓库里的 Windows 入口
+或
+codex_with_cc/unix_scripts/delegate_to_claude.sh     # 源仓库里的 Linux/macOS 入口
 ```
 
-4. 将 `docs/codex_with_cc` 安装到目标项目的：
+4. 将源仓库里的 `codex_with_cc/` 安装到目标项目的：
 
 ```text
 docs/codex_with_cc
 ```
+
+也就是：
+
+- 源仓库 `codex_with_cc/CODEX_WITH_CC.md` -> 目标项目 `docs/codex_with_cc/CODEX_WITH_CC.md`
+- 源仓库 `codex_with_cc/windows_scripts/...` -> 目标项目 `docs/codex_with_cc/windows_scripts/...`
+- 源仓库 `codex_with_cc/unix_scripts/...` -> 目标项目 `docs/codex_with_cc/unix_scripts/...`
 
 安装脚本还应确保 `.codex/codex_with_cc/tasks` 存在，用于放委派任务文件；实际任务文件应按 `.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md` 创建，避免同一天多个会话或多个子代理任务使用固定文件名互相覆盖；不要再把任务文件放进 `docs/codex_with_cc` 这种会进版本库的目录里，也不要再依赖 `.gitkeep` 之类的占位文件。
 同时应确保目标项目的 `.gitignore` 包含 `.codex/codex_with_cc`，避免本工作流的委派任务和运行产物被误提交，同时不影响目标项目 `.codex` 下其他共用内容。
@@ -108,12 +128,12 @@ If the task involves child agents, subagents, delegation, or any worker-executio
 
 ## Windows 安装
 
-如果当前平台是 Windows，并且可以运行 PowerShell Core，优先使用源仓库的安装脚本。
+如果当前平台是 Windows，并且可以运行 PowerShell Core，优先使用源仓库的 PowerShell 安装脚本。
 
 在源仓库根目录执行：
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -TargetRoot <target-project>
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_codex_with_cc.ps1 -TargetRoot <target-project>
 ```
 
 安装器不支持把源仓库自身作为 `-TargetRoot`；请使用外部目标项目目录，避免安装时移除源工作流目录。
@@ -134,7 +154,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -Targe
 如果用户明确要求不修改 `AGENTS.md`：
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\install_codex_with_cc.ps1 -TargetRoot <target-project> -SkipAgentEntrypoints
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_codex_with_cc.ps1 -TargetRoot <target-project> -SkipAgentEntrypoints
 ```
 
 Windows 验证命令，在目标项目根目录执行：
@@ -145,11 +165,17 @@ pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\test_delegate_session
 pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\run_real_delegate_chain_validation.ps1
 ```
 
-## macOS 安装
+## Linux/macOS 安装
 
-macOS 不要照抄 Windows PowerShell 命令给用户。应该把工作流迁移成 macOS 原生命令。
+Linux/macOS 不要照抄 Windows PowerShell 命令给用户。应该使用 Unix shell 安装器和 Unix 路径。
 
-macOS 支持尚未完整自动化；需要由安装 AI 参考源仓库里的 `codex_with_cc/unix_scripts`（或等价的 unix 脚本实现）行为，自行迁移为目标项目 `docs/codex_with_cc/macos_scripts` 下的原生 macOS 脚本。
+Linux/macOS 直接使用源仓库里的 `codex_with_cc/unix_scripts`，安装后对应目标项目里的 `docs/codex_with_cc/unix_scripts`。如果目标项目需要额外的本地化包装，再在目标项目侧做，不要把默认目录名改成 `macos_scripts`。
+
+在源仓库根目录执行：
+
+```bash
+bash ./scripts/install_codex_with_cc.sh --target-root <target-project>
+```
 
 执行原则：
 
@@ -161,20 +187,25 @@ macOS 支持尚未完整自动化；需要由安装 AI 参考源仓库里的 `co
 
 建议动作：
 
-1. 复制 `docs/codex_with_cc` 到目标项目的 `docs/codex_with_cc`。
-2. 将需要在 macOS 运行的 `.ps1` 脚本迁移为等价 `.sh` 脚本。
-3. 更新文档里的命令示例，让 macOS 项目引用 `.sh` 入口。
-4. 确认委派脚本仍然只能由 Codex 子代理调用。
-5. 运行 macOS 下可运行的验证脚本。
-6. 如果暂时不能完整迁移某个验证脚本，明确说明缺口。
+1. 运行 `scripts/install_codex_with_cc.sh`。
+2. 让 Linux/macOS 目标项目引用 `docs/codex_with_cc/unix_scripts/` 下的 `.sh` 入口。
+3. 确认委派脚本仍然只能由 Codex 子代理调用。
+4. 运行 Linux/macOS 下可运行的验证脚本。
+5. 如果暂时不能完整迁移某个验证脚本，明确说明缺口。
 
-macOS 子代理设置环境变量示例：
+Linux/macOS 子代理设置环境变量示例：
 
 ```bash
 export CODEX_CLAUDE_CHILD_THREAD=1
 ```
 
-macOS 委派入口可以命名为 `delegate_to_claude.sh` 或项目内更合适的名字。名字不重要，语义重要：主 Codex 线程不能直接运行它。
+Linux/macOS 委派入口可以命名为 `delegate_to_claude.sh` 或项目内更合适的名字。名字不重要，语义重要：主 Codex 线程不能直接运行它。
+
+如果用户明确要求不修改 `AGENTS.md`：
+
+```bash
+bash ./scripts/install_codex_with_cc.sh --target-root <target-project> --skip-agent-entrypoints
+```
 
 ## 委派规则
 
@@ -189,10 +220,33 @@ pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\delegate_to_claude.ps
   -BypassPermissions
 ```
 
+Linux/macOS 模板中的子代理标准调用形态：
+
+```bash
+export CODEX_CLAUDE_CHILD_THREAD=1
+bash ./docs/codex_with_cc/unix_scripts/delegate_to_claude.sh \
+  -f ./.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md \
+  --session-mode PrimaryReuse \
+  --session-key <stable-session-key> \
+  --bypass-permissions
+```
+
 并行任务按场景使用：
 
 - `PrimaryAnchor -AllowParallel`：并行批次的主线锚点。
 - `ParallelPool -AllowParallel`：独立支线任务池。
+
+Linux/macOS 下的并行调用形态对应为：
+
+```bash
+export CODEX_CLAUDE_CHILD_THREAD=1
+bash ./docs/codex_with_cc/unix_scripts/delegate_to_claude.sh \
+  -f ./.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md \
+  --session-mode PrimaryAnchor \
+  --session-key <stable-session-key> \
+  --bypass-permissions \
+  --allow-parallel
+```
 
 只有任务范围互不冲突时才允许并行。多个子代理同时修改同一批文件时，必须拆分写入边界或改为串行。
 
@@ -220,10 +274,22 @@ Windows 模板里，检查单次委派产物：
 pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\verify_delegate_artifacts.ps1
 ```
 
+Linux/macOS 模板里，检查单次委派产物：
+
+```bash
+bash ./docs/codex_with_cc/unix_scripts/verify_delegate_artifacts.sh
+```
+
 Windows 模板里，检查多轮链路连续性：
 
 ```powershell
 pwsh -NoProfile -File .\docs\codex_with_cc\windows_scripts\verify_delegate_chain.ps1
+```
+
+Linux/macOS 模板里，检查多轮链路连续性：
+
+```bash
+bash ./docs/codex_with_cc/unix_scripts/verify_delegate_chain.sh
 ```
 
 ## 安装完成后回复用户

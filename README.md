@@ -1,4 +1,8 @@
-> 如果你是 Codex，并且用户让你把本仓库集成到某个项目里：请阅读 [AI_INSTALL.md](AI_INSTALL.md)。
+> 如果你是 Codex，并且用户让你把本仓库集成到某个项目里：请先阅读 [AI_INSTALL.md](AI_INSTALL.md)。
+>
+> 如果你需要区分“源仓库路径”和“安装到目标项目后的路径”：再阅读 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)。
+>
+> 如果你正在直接修改本仓库里的委派工作流：请阅读 [codex_with_cc/CODEX_WITH_CC.md](codex_with_cc/CODEX_WITH_CC.md)。
 >
 > 下面内容是给人看的，AI无需阅读。
 
@@ -19,6 +23,24 @@
 ```text
 请把 https://github.com/kevin0201z/codex_with_cc 调度子代理工作流集成或更新到当前项目。
 ```
+
+# 仓库结构
+
+这个仓库自己是**源仓库**，不是安装后的目标项目，所以这里的工作流文件路径是：
+
+- `scripts/install_codex_with_cc.ps1`
+- `scripts/install_codex_with_cc.sh`
+- `codex_with_cc/CODEX_WITH_CC.md`
+- `codex_with_cc/windows_scripts/...`
+- `codex_with_cc/unix_scripts/...`
+
+安装到别的项目后，对应路径会变成：
+
+- `docs/codex_with_cc/CODEX_WITH_CC.md`
+- `docs/codex_with_cc/windows_scripts/...`
+- `docs/codex_with_cc/unix_scripts/...`
+
+更完整的路径映射见 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)。
 
 # 使用姿势
 

@@ -1,8 +1,7 @@
 param(
   [string]$TargetRoot = (Get-Location).Path,
-  [ValidateSet('Auto', 'Windows', 'macOS')]
+  [ValidateSet('Auto', 'Windows', 'Linux', 'macOS')]
   [string]$Platform = 'Auto',
-  [switch]$Force,
   [switch]$SkipAgentEntrypoints
 )
 
@@ -28,7 +27,7 @@ function Test-PathInside {
 function Resolve-InstallPlatform {
   param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Auto', 'Windows', 'macOS')]
+    [ValidateSet('Auto', 'Windows', 'Linux', 'macOS')]
     [string]$Platform
   )
 
@@ -40,11 +39,15 @@ function Resolve-InstallPlatform {
     return 'Windows'
   }
 
+  if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Linux)) {
+    return 'Linux'
+  }
+
   if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)) {
     return 'macOS'
   }
 
-  throw 'Unsupported install platform. Pass -Platform Windows or -Platform macOS explicitly.'
+  throw 'Unsupported install platform. Pass -Platform Windows, -Platform Linux, or -Platform macOS explicitly.'
 }
 
 function Update-AgentEntrypoint {
@@ -110,10 +113,11 @@ function Update-GitIgnore {
   [System.IO.File]::WriteAllText($Path, $updated, (New-Object System.Text.UTF8Encoding($false)))
 }
 
+$repoRoot = Split-Path -Path $PSScriptRoot -Parent
 $installerRoot = $PSScriptRoot
 $installPlatform = Resolve-InstallPlatform -Platform $Platform
-$resolvedInstallerRoot = Get-FullPath -Path $installerRoot
-$sourceWorkflowRoot = Join-Path $installerRoot 'codex_with_cc'
+$resolvedRepoRoot = Get-FullPath -Path $repoRoot
+$sourceWorkflowRoot = Join-Path $resolvedRepoRoot 'codex_with_cc'
 if (-not (Test-Path -LiteralPath $sourceWorkflowRoot)) {
   throw "Workflow source was not found: $sourceWorkflowRoot"
 }
@@ -125,8 +129,12 @@ if (-not (Test-Path -LiteralPath $resolvedTargetRoot)) {
 }
 $resolvedTargetRoot = (Resolve-Path -LiteralPath $resolvedTargetRoot).Path
 
-if ([string]::Equals($resolvedInstallerRoot, $resolvedTargetRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-  throw "Refusing to install codex_with_cc into its own source repository. Choose a different -TargetRoot so the installer does not modify its source repository: $resolvedInstallerRoot"
+if ([string]::Equals($resolvedRepoRoot, $resolvedTargetRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+  throw "Refusing to install codex_with_cc into its own source repository. Choose a different -TargetRoot so the installer does not modify its source repository: $resolvedRepoRoot"
+}
+
+if (Test-PathInside -Child $resolvedTargetRoot -Parent $resolvedRepoRoot) {
+  throw "Refusing to install codex_with_cc into a subdirectory of its own source repository. Choose an external -TargetRoot outside: $resolvedTargetRoot"
 }
 
 $docsRoot = Join-Path $resolvedTargetRoot 'docs'
@@ -148,7 +156,7 @@ if (Test-Path -LiteralPath $workflowRoot) {
 
 New-Item -ItemType Directory -Path $docsRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $workflowRoot -Force | Out-Null
-$excludedScriptRoot = if ($installPlatform -eq 'Windows') { 'macos_scripts' } else { 'windows_scripts' }
+$excludedScriptRoot = if ($installPlatform -eq 'Windows') { 'unix_scripts' } else { 'windows_scripts' }
 foreach ($sourceItem in Get-ChildItem -LiteralPath $sourceWorkflowRoot -Force) {
   if ($sourceItem.Name -eq $excludedScriptRoot) {
     continue

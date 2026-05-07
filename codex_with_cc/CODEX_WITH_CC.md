@@ -2,6 +2,24 @@
 
 This document is the portable entry point for the Codex -> Codex child agent -> Claude Code CLI workflow.
 
+## Path Context
+
+This file is written as a portable workflow contract, so command examples below use the **installed target-project paths** under `docs/codex_with_cc/...`.
+
+When you are editing this source repository itself, the corresponding source paths are:
+
+- `codex_with_cc/CODEX_WITH_CC.md`
+- `codex_with_cc/windows_scripts/...`
+- `codex_with_cc/unix_scripts/...`
+
+When this workflow is installed into another repository, the corresponding target-project paths are:
+
+- `docs/codex_with_cc/CODEX_WITH_CC.md`
+- `docs/codex_with_cc/windows_scripts/...`
+- `docs/codex_with_cc/unix_scripts/...`
+
+Use source-repo paths when changing this repository. Use target-project paths when writing delegate commands, verification commands, or `AGENTS.md` guidance for an installed project.
+
 ## Required Reading
 1. Read this file before using the workflow in this repository.
 

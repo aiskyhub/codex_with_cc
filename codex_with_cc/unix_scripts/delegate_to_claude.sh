@@ -294,6 +294,12 @@ if [[ "$writable" != "true" ]]; then
     exit 1
 fi
 
+write_delegate_json() {
+    local path="$1"
+    local json="$2"
+    write_claude_delegate_json_file "$path" "$json"
+}
+
 SCOPE_TEXT=""
 if [[ ${#SCOPE[@]} -gt 0 ]]; then
     SCOPE_TEXT=$(printf -- '- %s\n' "${SCOPE[@]}")
@@ -364,29 +370,29 @@ Hard requirements:
 echo "$PROMPT" > "$PROMPT_PATH"
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > "$CONFIG_PATH" <<EOF
+write_delegate_json "$CONFIG_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "repoRoot": "$REPO_ROOT",
-  "mode": "$MODE",
-  "model": "$MODEL",
-  "sessionName": "$EFFECTIVE_NAME",
-  "sessionMode": "$SESSION_MODE",
-  "sessionKey": "$EFFECTIVE_SESSION_KEY",
-  "sessionStatePath": "$SESSION_STATE_PATH",
-  "sessionStateLockPath": "$SESSION_STATE_LOCK_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "statusPath": "$STATUS_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
-  "lockPath": "$LOCK_PATH",
-  "taskFile": ${TASK_FILE:+\"$TASK_FILE\"},
-  "maxBudgetUsd": ${MAX_BUDGET_USD:-null},
+  "runId": $(json_quote "$RUN_ID"),
+  "repoRoot": $(json_quote "$REPO_ROOT"),
+  "mode": $(json_quote "$MODE"),
+  "model": $(json_quote "$MODEL"),
+  "sessionName": $(json_quote "$EFFECTIVE_NAME"),
+  "sessionMode": $(json_quote "$SESSION_MODE"),
+  "sessionKey": $(json_quote "$EFFECTIVE_SESSION_KEY"),
+  "sessionStatePath": $(json_quote "$SESSION_STATE_PATH"),
+  "sessionStateLockPath": $(json_quote "$SESSION_STATE_LOCK_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "statusPath": $(json_quote "$STATUS_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
+  "lockPath": $(json_quote "$LOCK_PATH"),
+  "taskFile": $(json_quote_or_null "${TASK_FILE:-}"),
+  "maxBudgetUsd": $(json_number_or_null "${MAX_BUDGET_USD:-}"),
   "bypassPermissions": $BYPASS_PERMISSIONS,
   "allowParallel": $ALLOW_PARALLEL,
   "initialSessionId": null,
@@ -394,23 +400,24 @@ cat > "$CONFIG_PATH" <<EOF
   "attemptCount": 0,
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
 
-cat > "$STATUS_PATH" <<EOF
+write_delegate_json "$STATUS_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "status": "starting",
+  "runId": $(json_quote "$RUN_ID"),
+  "status": $(json_quote "starting"),
   "pid": $$,
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
   "linesWritten": 0,
   "outputBytes": 0,
   "exitCode": null,
@@ -418,9 +425,10 @@ cat > "$STATUS_PATH" <<EOF
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
   "attempts": [],
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
 
 complete_claude_delegate_startup_failure() {
     local failure_message="$1"
@@ -459,31 +467,31 @@ Risks Or Follow-ups
     output_bytes=$(wc -c < "$RESOLVED_OUTPUT_PATH" 2>/dev/null || echo 0)
     
     NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "$STATUS_PATH" <<EOF
+    write_delegate_json "$STATUS_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "status": "failed",
+  "runId": $(json_quote "$RUN_ID"),
+  "status": $(json_quote "failed"),
   "pid": $$,
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
   "linesWritten": 0,
   "outputBytes": $output_bytes,
   "exitCode": 1,
   "attemptCount": 1,
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
-  "failureDisposition": "NEED_HUMAN_INTERVENTION",
-  "failureSummary": "$failure_summary",
+  "failureDisposition": $(json_quote "NEED_HUMAN_INTERVENTION"),
+  "failureSummary": $(json_quote "$failure_summary"),
   "attempts": [
     {
       "attempt": 1,
-      "sessionId": "",
+      "sessionId": $(json_quote ""),
       "resume": false,
       "retryReason": null,
       "exitCode": 1,
@@ -492,47 +500,49 @@ Risks Or Follow-ups
       "capturedFinalResult": true
     }
   ],
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
     
-    cat > "$CONFIG_PATH" <<EOF
+    write_delegate_json "$CONFIG_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "repoRoot": "$REPO_ROOT",
-  "mode": "$MODE",
-  "model": "$MODEL",
-  "sessionName": "$EFFECTIVE_NAME",
-  "sessionMode": "$SESSION_MODE",
-  "sessionKey": "$EFFECTIVE_SESSION_KEY",
-  "sessionStatePath": "$SESSION_STATE_PATH",
-  "sessionStateLockPath": "$SESSION_STATE_LOCK_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "statusPath": "$STATUS_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
-  "lockPath": "$LOCK_PATH",
-  "taskFile": ${TASK_FILE:+\"$TASK_FILE\"},
-  "maxBudgetUsd": ${MAX_BUDGET_USD:-null},
+  "runId": $(json_quote "$RUN_ID"),
+  "repoRoot": $(json_quote "$REPO_ROOT"),
+  "mode": $(json_quote "$MODE"),
+  "model": $(json_quote "$MODEL"),
+  "sessionName": $(json_quote "$EFFECTIVE_NAME"),
+  "sessionMode": $(json_quote "$SESSION_MODE"),
+  "sessionKey": $(json_quote "$EFFECTIVE_SESSION_KEY"),
+  "sessionStatePath": $(json_quote "$SESSION_STATE_PATH"),
+  "sessionStateLockPath": $(json_quote "$SESSION_STATE_LOCK_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "statusPath": $(json_quote "$STATUS_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
+  "lockPath": $(json_quote "$LOCK_PATH"),
+  "taskFile": $(json_quote_or_null "${TASK_FILE:-}"),
+  "maxBudgetUsd": $(json_number_or_null "${MAX_BUDGET_USD:-}"),
   "bypassPermissions": $BYPASS_PERMISSIONS,
   "allowParallel": $ALLOW_PARALLEL,
-  "initialSessionId": "",
+  "initialSessionId": $(json_quote ""),
   "initialResume": false,
-  "sessionId": "",
+  "sessionId": $(json_quote ""),
   "resume": false,
   "attemptCount": 1,
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
-  "failureDisposition": "NEED_HUMAN_INTERVENTION",
-  "failureSummary": "$failure_summary",
-  "updatedAt": "$NOW"
+  "failureDisposition": $(json_quote "NEED_HUMAN_INTERVENTION"),
+  "failureSummary": $(json_quote "$failure_summary"),
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
 }
 
 LOCK_FD=""
@@ -553,21 +563,22 @@ if [[ "$ALLOW_PARALLEL" != "true" ]]; then
         exec 3>"$LOCK_PATH"
         if flock -x -n 3; then
             LOCK_FD=3
-            
-            cat > "$LOCK_PATH" <<EOF
+
+            write_delegate_json "$LOCK_PATH" "$(cat <<EOF
 {
-  "runId": "$RUN_ID",
-  "sessionName": "$EFFECTIVE_NAME",
+  "runId": $(json_quote "$RUN_ID"),
+  "sessionName": $(json_quote "$EFFECTIVE_NAME"),
   "pid": $$,
-  "startedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "mode": "$MODE"
+  "startedAt": $(json_quote "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"),
+  "mode": $(json_quote "$MODE")
 }
 EOF
+)"
             break
         fi
         
         if [[ $(date +%s) -ge $LOCK_DEADLINE ]]; then
-            local lock_snapshot=""
+            lock_snapshot=""
             if [[ -f "$LOCK_PATH" ]]; then
                 lock_snapshot=$(cat "$LOCK_PATH" 2>/dev/null || echo "<unreadable>")
             fi
@@ -600,41 +611,42 @@ SESSION_ID=$(echo "$SESSION_LEASE" | jq -r '.sessionId')
 RESUME=$(echo "$SESSION_LEASE" | jq -r '.resume')
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > "$CONFIG_PATH" <<EOF
+write_delegate_json "$CONFIG_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "repoRoot": "$REPO_ROOT",
-  "mode": "$MODE",
-  "model": "$MODEL",
-  "sessionName": "$EFFECTIVE_NAME",
-  "sessionMode": "$SESSION_MODE",
-  "sessionKey": "$EFFECTIVE_SESSION_KEY",
-  "sessionStatePath": "$SESSION_STATE_PATH",
-  "sessionStateLockPath": "$SESSION_STATE_LOCK_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "statusPath": "$STATUS_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
-  "lockPath": "$LOCK_PATH",
-  "taskFile": ${TASK_FILE:+\"$TASK_FILE\"},
-  "maxBudgetUsd": ${MAX_BUDGET_USD:-null},
+  "runId": $(json_quote "$RUN_ID"),
+  "repoRoot": $(json_quote "$REPO_ROOT"),
+  "mode": $(json_quote "$MODE"),
+  "model": $(json_quote "$MODEL"),
+  "sessionName": $(json_quote "$EFFECTIVE_NAME"),
+  "sessionMode": $(json_quote "$SESSION_MODE"),
+  "sessionKey": $(json_quote "$EFFECTIVE_SESSION_KEY"),
+  "sessionStatePath": $(json_quote "$SESSION_STATE_PATH"),
+  "sessionStateLockPath": $(json_quote "$SESSION_STATE_LOCK_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "statusPath": $(json_quote "$STATUS_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
+  "lockPath": $(json_quote "$LOCK_PATH"),
+  "taskFile": $(json_quote_or_null "${TASK_FILE:-}"),
+  "maxBudgetUsd": $(json_number_or_null "${MAX_BUDGET_USD:-}"),
   "bypassPermissions": $BYPASS_PERMISSIONS,
   "allowParallel": $ALLOW_PARALLEL,
-  "initialSessionId": "$SESSION_ID",
+  "initialSessionId": $(json_quote "$SESSION_ID"),
   "initialResume": $RESUME,
-  "sessionId": "$SESSION_ID",
+  "sessionId": $(json_quote "$SESSION_ID"),
   "resume": $RESUME,
   "attemptCount": 0,
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
 
 echo "Delegating to Claude Code: $(command -v claude)"
 echo "RunId: $RUN_ID"
@@ -653,19 +665,19 @@ if [[ "$DRY_RUN" == "true" ]]; then
     echo "Dry run enabled; Claude Code was not invoked."
     
     NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    cat > "$STATUS_PATH" <<EOF
+    write_delegate_json "$STATUS_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "status": "completed",
+  "runId": $(json_quote "$RUN_ID"),
+  "status": $(json_quote "completed"),
   "pid": $$,
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
   "linesWritten": 0,
   "outputBytes": 0,
   "exitCode": 0,
@@ -673,9 +685,10 @@ if [[ "$DRY_RUN" == "true" ]]; then
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
   "attempts": [],
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
     
     release_claude_session_lease \
         "$SESSION_STATE_PATH" \
@@ -689,19 +702,19 @@ EOF
 fi
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > "$STATUS_PATH" <<EOF
+write_delegate_json "$STATUS_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "status": "running",
+  "runId": $(json_quote "$RUN_ID"),
+  "status": $(json_quote "running"),
   "pid": $$,
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
   "linesWritten": 0,
   "outputBytes": 0,
   "exitCode": null,
@@ -709,9 +722,10 @@ cat > "$STATUS_PATH" <<EOF
   "retryCount": 0,
   "maxRetryCount": $MAX_RETRY_COUNT,
   "attempts": [],
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
 
 PROMPT_TEXT=$(cat "$PROMPT_PATH")
 
@@ -736,11 +750,11 @@ while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
     
     echo '{"assistantTexts":[],"traceLines":[],"finalText":"","sawAssistantText":false,"sawResultSuccess":false,"capturedFinalResultHeading":false}' > "$CAPTURE_STATE_FILE"
     
-    local -a ATTEMPT_RAW_LINES=()
+    ATTEMPT_RAW_LINES=()
     
     NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     
-    local attempt_resume="false"
+    attempt_resume="false"
     if [[ "$ATTEMPT" -eq 1 ]]; then
         attempt_resume="$RESUME"
     else
@@ -804,7 +818,7 @@ while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
         ATTEMPT_RAW_LINES+=("$line")
         echo "$line" >> "$RAW_STREAM_TMP"
         
-        local trace_line=""
+        trace_line=""
         if echo "$line" | jq -e . >/dev/null 2>&1; then
             trace_line=$(update_claude_delegate_stream_capture "$line" "$CAPTURE_STATE_FILE")
         else
@@ -826,7 +840,6 @@ while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
     CAPTURE_STATE=$(cat "$CAPTURE_STATE_FILE")
     FINAL_TEXT=$(echo "$CAPTURE_STATE" | jq -r '.finalText')
     if [[ -z "$FINAL_TEXT" ]]; then
-        local texts
         texts=$(echo "$CAPTURE_STATE" | jq -r '.assistantTexts[-1] // empty')
         if [[ -n "$texts" ]]; then
             FINAL_TEXT="$texts"
@@ -989,19 +1002,19 @@ else
 fi
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > "$STATUS_PATH" <<EOF
+write_delegate_json "$STATUS_PATH" "$(cat <<EOF
 {
   "artifactSchema": $ARTIFACT_SCHEMA_VERSION,
-  "invocationContract": "$INVOCATION_CONTRACT",
-  "childThreadMarkerName": "$REQUIRED_CHILD_THREAD_MARKER_NAME",
+  "invocationContract": $(json_quote "$INVOCATION_CONTRACT"),
+  "childThreadMarkerName": $(json_quote "$REQUIRED_CHILD_THREAD_MARKER_NAME"),
   "childThreadMarkerValidated": true,
-  "runId": "$RUN_ID",
-  "status": "$FINAL_STATUS",
+  "runId": $(json_quote "$RUN_ID"),
+  "status": $(json_quote "$FINAL_STATUS"),
   "pid": $$,
-  "outputPath": "$RESOLVED_OUTPUT_PATH",
-  "promptPath": "$PROMPT_PATH",
-  "rawStreamPath": "$RAW_STREAM_PATH",
-  "tracePath": "$TRACE_PATH",
+  "outputPath": $(json_quote "$RESOLVED_OUTPUT_PATH"),
+  "promptPath": $(json_quote "$PROMPT_PATH"),
+  "rawStreamPath": $(json_quote "$RAW_STREAM_PATH"),
+  "tracePath": $(json_quote "$TRACE_PATH"),
   "linesWritten": $(wc -l < "$RAW_STREAM_PATH" 2>/dev/null || echo 0),
   "outputBytes": $OUTPUT_BYTES,
   "exitCode": $EXIT_CODE,
@@ -1009,12 +1022,13 @@ cat > "$STATUS_PATH" <<EOF
   "retryCount": $RETRY_COUNT,
   "maxRetryCount": $MAX_RETRY_COUNT,
   "outputWasNormalized": $OUTPUT_WAS_NORMALIZED,
-  "failureDisposition": ${FAILURE_DISPOSITION:+\"$FAILURE_DISPOSITION\"},
-  "failureSummary": ${FAILURE_SUMMARY:+\"$FAILURE_SUMMARY\"},
+  "failureDisposition": $(json_quote_or_null "${FAILURE_DISPOSITION:-}"),
+  "failureSummary": $(json_quote_or_null "${FAILURE_SUMMARY:-}"),
   "attempts": [],
-  "updatedAt": "$NOW"
+  "updatedAt": $(json_quote "$NOW")
 }
 EOF
+)"
 
 if [[ $EXIT_CODE -ne 0 ]]; then
     if [[ "$FAILURE_DISPOSITION" == "NEED_HUMAN_INTERVENTION" ]]; then
