@@ -786,8 +786,7 @@ while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
         "$SESSION_ID" \
         "$attempt_resume" \
         "${MAX_BUDGET_USD:-}" \
-        "$BYPASS_PERMISSIONS" \
-        "$PROMPT_TEXT")
+        "$BYPASS_PERMISSIONS")
     
     if [[ $ATTEMPT -eq 1 ]]; then
         jq --arg sid "$SESSION_ID" --argjson resume "$RESUME" \
@@ -833,7 +832,7 @@ while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
         jq --argjson lines $((LINES_WRITTEN + 1)) --arg now "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
             '.linesWritten = $lines | .lastOutputAt = $now' \
             "$STATUS_PATH" > "${STATUS_PATH}.tmp" && mv "${STATUS_PATH}.tmp" "$STATUS_PATH"
-    done < <(claude "${CLAUDE_ARGS[@]}" 2>&1)
+    done < <(claude "${CLAUDE_ARGS[@]}" "$PROMPT_TEXT" 2>&1)
     EXIT_CODE=$?
     set -e
     

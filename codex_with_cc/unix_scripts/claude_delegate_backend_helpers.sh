@@ -422,3 +422,39 @@ test_claude_delegate_needs_fresh_session_retry() {
         echo "false"
     fi
 }
+
+new_claude_delegate_cli_args() {
+    local model="$1"
+    local session_name="$2"
+    local session_id="$3"
+    local resume="$4"
+    local max_budget_usd="$5"
+    local bypass_permissions="$6"
+
+    printf '%s\n' '--verbose'
+    printf '%s\n' '--print'
+    printf '%s\n' '--output-format'
+    printf '%s\n' 'stream-json'
+    printf '%s\n' '--model'
+    printf '%s\n' "$model"
+    printf '%s\n' '--name'
+    printf '%s\n' "$session_name"
+    printf '%s\n' '--permission-mode'
+    printf '%s\n' 'acceptEdits'
+
+    if [[ "$resume" == "true" ]]; then
+        printf '%s\n' '--resume'
+    else
+        printf '%s\n' '--session-id'
+    fi
+    printf '%s\n' "$session_id"
+
+    if [[ -n "$max_budget_usd" ]]; then
+        printf '%s\n' '--max-budget-usd'
+        printf '%s\n' "$max_budget_usd"
+    fi
+
+    if [[ "$bypass_permissions" == "true" ]]; then
+        printf '%s\n' '--dangerously-skip-permissions'
+    fi
+}

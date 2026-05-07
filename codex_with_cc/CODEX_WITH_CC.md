@@ -34,11 +34,24 @@ Use source-repo paths when changing this repository. Use target-project paths wh
 8. Claude workers must keep changes inside the delegated scope, run the required verification, and finish with the exact report headings defined in this document.
 9. If the Codex sandbox or delegated runner cannot execute the same worker command, run that exact command in a trusted local terminal instead.
 10. Claude workers must read and follow all applicable Codex project skills under `.codex` before implementing or changing behavior.
+11. If the delegate script exits with a non-zero code, pre-launch validation fails, or the Claude Code CLI invocation cannot proceed, the Codex main thread must report the failure reason and the resolved delegate artifacts (status, config, trace). The Codex main thread must NOT fall back to the default Codex subagent flow, a direct `claude` invocation, or any workaround that bypasses the delegate script.
 
 ## Trusted Local Terminal Fallback
 This fallback is an execution-location fallback only. Preserve the same `CODEX_CLAUDE_CHILD_THREAD=1` marker, task file, session mode, session key, artifact root, and permission flags that the child thread would have used.
 
 Do not replace this with the default Codex subagent flow, a direct `claude` command, or a modified worker command. Report that the trusted terminal fallback was used and include the command outcome in verification.
+
+## Delegation Failure Contract
+When the delegate script fails, the Codex main thread must observe the following failure contract:
+
+1. Read the delegate status file (`status_<RunId>.json`) to determine the failure disposition.
+2. Read the delegate config file (`config_<RunId>.json`) for the failure summary and context.
+3. Read the trace file (`trace_<RunId>.log`) for diagnostic details.
+4. Report the failure reason, the resolved artifacts, and any actionable next steps to the user.
+5. Do NOT retry the task using the default Codex subagent, a direct `claude` command, or any workflow that skips the delegate script.
+6. Do NOT silently absorb the failure and proceed as if the task was handled by another mechanism.
+
+The only valid recovery path is to fix the root cause (missing `claude` CLI, missing dependencies, invalid task file, etc.) and re-invoke the delegate script with the same contract.
 
 ## Roles
 - Codex main thread: understand the request, define scope, create child threads, review results, and decide final acceptance.
