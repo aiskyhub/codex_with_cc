@@ -9,6 +9,14 @@ write_claude_delegate_json_file() {
     local filename
     filename=$(basename "$path")
 
+    local now
+    now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    if echo "$data" | jq -e '.updatedAt' >/dev/null 2>&1; then
+        data=$(echo "$data" | jq --arg now "$now" '.updatedAt = $now')
+    else
+        data=$(echo "$data" | jq --arg now "$now" '. + {updatedAt: $now}')
+    fi
+
     mkdir -p "$dir"
     local tmpfile
     tmpfile=$(mktemp "${dir}/.${filename}.XXXXXX")
@@ -256,7 +264,7 @@ update_claude_delegate_stream_capture() {
             texts=$(echo "$message" | jq -r '.content[] | select(.type == "text") | .text' 2>/dev/null || echo "")
             if [[ -n "$texts" ]]; then
                 local combined_text
-                combined_text=$(echo "$texts" | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                combined_text=$(printf '%s' "$texts" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
                 local has_final
                 has_final=$(test_claude_delegate_text_has_final_result_heading "$combined_text")

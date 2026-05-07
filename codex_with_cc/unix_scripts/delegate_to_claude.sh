@@ -266,7 +266,7 @@ SESSION_STATE_PATH="$SESSION_POOLS_ROOT/$SAFE_SESSION_KEY.json"
 SESSION_STATE_LOCK_PATH="$SESSION_POOLS_ROOT/$SAFE_SESSION_KEY.lock"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S_%3N")
-RUN_ID="${TIMESTAMP}_$(head -c 8 /dev/urandom 2>/dev/null | xxd -p 2>/dev/null || echo "$RANDOM$RANDOM" | head -c 8)"
+RUN_ID="${TIMESTAMP}_$(head -c 8 /dev/urandom 2>/dev/null | xxd -p 2>/dev/null || printf '%04x%04x' "$RANDOM" "$RANDOM")"
 
 if [[ -z "$NAME" ]]; then
     EFFECTIVE_NAME="${NAME_PREFIX}-${RUN_ID}"
@@ -587,7 +587,8 @@ EOF
             exit 1
         fi
         
-        sleep 0.5
+        poll_secs=$(awk "BEGIN {printf \"%.3f\", $LOCK_POLL_MILLISECONDS / 1000}")
+        sleep "$poll_secs"
     done
 fi
 

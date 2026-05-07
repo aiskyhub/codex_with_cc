@@ -16,8 +16,8 @@ Usage: $0 [OPTIONS]
 
 Options:
   --anchor-run-id RUN_ID      Anchor run ID
-  --parallel-run-ids IDS      Parallel run IDs (semicolon-separated)
-  --reuse-run-ids IDS         Reuse run IDs (semicolon-separated)
+  --parallel-run-ids IDS      Parallel run IDs (comma-separated)
+  --reuse-run-ids IDS         Reuse run IDs (comma-separated)
   -a, --artifact-root PATH    Artifact root directory
   --session-key KEY           Session key for session state verification
   -h, --help                  Show this help message
@@ -31,12 +31,12 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --parallel-run-ids)
-            IFS=';' read -ra PARTS <<< "$2"
+            IFS=',;' read -ra PARTS <<< "$2"
             PARALLEL_RUN_IDS=("${PARTS[@]}")
             shift 2
             ;;
         --reuse-run-ids)
-            IFS=';' read -ra PARTS <<< "$2"
+            IFS=',;' read -ra PARTS <<< "$2"
             REUSE_RUN_IDS=("${PARTS[@]}")
             shift 2
             ;;
