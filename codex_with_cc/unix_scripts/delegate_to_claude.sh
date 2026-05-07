@@ -812,12 +812,20 @@ FINAL_TEXT=""
 OUTPUT_RESOLUTION=""
 FAILURE_DISPOSITION=""
 FAILURE_SUMMARY=""
+ATTEMPT_RECORDS='[]'
 
 CAPTURE_STATE_FILE=$(mktemp)
 echo '{"assistantTexts":[],"traceLines":[],"finalText":"","sawAssistantText":false,"sawResultSuccess":false,"capturedFinalResultHeading":false}' > "$CAPTURE_STATE_FILE"
 
 RAW_STREAM_TMP=$(mktemp)
 TRACE_TMP=$(mktemp)
+
+record_attempt_audit() {
+    ATTEMPT_RECORDS=$(append_claude_delegate_attempt_record "$ATTEMPT_RECORDS" "$ATTEMPT_RECORD")
+    jq --argjson attempts "$ATTEMPT_RECORDS" \
+        '.attempts = $attempts' \
+        "$STATUS_PATH" > "${STATUS_PATH}.tmp" && mv "${STATUS_PATH}.tmp" "$STATUS_PATH"
+}
 
 while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
     ATTEMPT=$((ATTEMPT + 1))
@@ -954,6 +962,8 @@ while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
         jq --argjson retry "$RETRY_COUNT" --arg reason "$RETRY_REASON" \
             '.retryCount = $retry | .lastRetryReason = $reason' \
             "$STATUS_PATH" > "${STATUS_PATH}.tmp" && mv "${STATUS_PATH}.tmp" "$STATUS_PATH"
+
+        record_attempt_audit
         
         if [[ "$RETRY_WITH_FRESH_SESSION" == "true" ]]; then
             echo "Warning: Claude rejected resumed session '$SESSION_ID'. Retrying once with a fresh session." >&2
@@ -1038,6 +1048,8 @@ Risks Or Follow-ups
     if [[ "$OUTPUT_WAS_NORMALIZED" == "true" ]]; then
         ATTEMPT_RECORD=$(echo "$ATTEMPT_RECORD" | jq '.capturedFinalResult = true | .outputWasNormalized = true')
     fi
+
+    record_attempt_audit
     
     break
 done
@@ -1097,7 +1109,7 @@ write_delegate_json "$STATUS_PATH" "$(cat <<EOF
   "outputWasNormalized": $OUTPUT_WAS_NORMALIZED,
   "failureDisposition": $(json_quote_or_null "${FAILURE_DISPOSITION:-}"),
   "failureSummary": $(json_quote_or_null "${FAILURE_SUMMARY:-}"),
-  "attempts": [],
+  "attempts": $ATTEMPT_RECORDS,
   "updatedAt": $(json_quote "$NOW")
 }
 EOF

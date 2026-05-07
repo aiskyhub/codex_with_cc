@@ -53,6 +53,20 @@ json_number_or_null() {
     fi
 }
 
+append_claude_delegate_attempt_record() {
+    local attempts_json="${1:-[]}"
+    local attempt_record="$2"
+
+    if [[ -z "$attempts_json" ]]; then
+        attempts_json='[]'
+    fi
+
+    jq -cn \
+        --argjson attempts "$attempts_json" \
+        --argjson record "$attempt_record" \
+        '$attempts + [$record]'
+}
+
 test_claude_delegate_text_has_final_result_heading() {
     local text="$1"
     if [[ -z "$text" ]]; then

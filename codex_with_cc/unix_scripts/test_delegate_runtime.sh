@@ -303,6 +303,140 @@ test_json_file_atomic_write() {
     fi
 }
 
+test_attempt_record_append() {
+    local attempts='[]'
+    local record='{"attempt":1,"sessionId":"session-1","resume":false,"retryReason":null,"exitCode":0,"sawAssistantText":true,"sawResultSuccess":true,"capturedFinalResult":true}'
+
+    local updated
+    updated=$(append_claude_delegate_attempt_record "$attempts" "$record")
+
+    local length
+    length=$(echo "$updated" | jq 'length')
+    local session_id
+    session_id=$(echo "$updated" | jq -r '.[0].sessionId')
+
+    if [[ "$length" == "1" ]] && [[ "$session_id" == "session-1" ]]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+test_verify_delegate_artifacts_valid_completed_run() {
+    local tmp_root
+    tmp_root=$(mktemp -d)
+    local run_id="test_run"
+    local output_path="$tmp_root/claude_${run_id}.md"
+    local prompt_path="$tmp_root/prompt_${run_id}.md"
+    local raw_stream_path="$tmp_root/stream_${run_id}.jsonl"
+    local trace_path="$tmp_root/trace_${run_id}.log"
+    local status_path="$tmp_root/status_${run_id}.json"
+    local config_path="$tmp_root/config_${run_id}.json"
+
+    cat <<'EOF' > "$output_path"
+Process Log
+- test
+
+Summary
+ok
+
+Changed Files
+None
+
+Verification
+- ok
+
+Final Result
+SUCCESS
+
+Risks Or Follow-ups
+None
+EOF
+    printf 'prompt\n' > "$prompt_path"
+    : > "$raw_stream_path"
+    printf '[trace] ok\n' > "$trace_path"
+
+    cat <<EOF > "$status_path"
+{
+  "artifactSchema": 2,
+  "invocationContract": "spawn_agent_child_only",
+  "childThreadMarkerName": "CODEX_CLAUDE_CHILD_THREAD",
+  "childThreadMarkerValidated": true,
+  "runId": "$run_id",
+  "status": "completed",
+  "pid": 123,
+  "outputPath": "$output_path",
+  "promptPath": "$prompt_path",
+  "rawStreamPath": "$raw_stream_path",
+  "tracePath": "$trace_path",
+  "linesWritten": 0,
+  "outputBytes": 1,
+  "exitCode": 0,
+  "attemptCount": 1,
+  "retryCount": 0,
+  "maxRetryCount": 5,
+  "outputWasNormalized": false,
+  "failureDisposition": null,
+  "failureSummary": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "sessionId": "session-1",
+      "resume": false,
+      "retryReason": null,
+      "exitCode": 0,
+      "sawAssistantText": true,
+      "sawResultSuccess": true,
+      "capturedFinalResult": true
+    }
+  ]
+}
+EOF
+
+    cat <<EOF > "$config_path"
+{
+  "artifactSchema": 2,
+  "invocationContract": "spawn_agent_child_only",
+  "childThreadMarkerName": "CODEX_CLAUDE_CHILD_THREAD",
+  "childThreadMarkerValidated": true,
+  "runId": "$run_id",
+  "repoRoot": "/tmp/repo",
+  "mode": "Implement",
+  "model": "sonnet",
+  "sessionName": "codex-delegate-test",
+  "sessionMode": "PrimaryReuse",
+  "sessionKey": "test-session",
+  "sessionStatePath": "/tmp/session.json",
+  "sessionStateLockPath": "/tmp/session.lock",
+  "promptPath": "$prompt_path",
+  "outputPath": "$output_path",
+  "statusPath": "$status_path",
+  "rawStreamPath": "$raw_stream_path",
+  "tracePath": "$trace_path",
+  "lockPath": "/tmp/delegate.lock",
+  "taskFile": null,
+  "maxBudgetUsd": null,
+  "bypassPermissions": true,
+  "allowParallel": false,
+  "initialSessionId": "session-1",
+  "initialResume": false,
+  "sessionId": "session-1",
+  "resume": false,
+  "attemptCount": 1,
+  "retryCount": 0,
+  "maxRetryCount": 5
+}
+EOF
+
+    local result="false"
+    if bash "$SCRIPT_DIR/verify_delegate_artifacts.sh" -r "$run_id" -a "$tmp_root" >/dev/null 2>&1; then
+        result="true"
+    fi
+
+    rm -rf "$tmp_root"
+    echo "$result"
+}
+
 echo "========================================"
 echo "Running delegate runtime tests"
 echo "========================================"
@@ -321,6 +455,8 @@ run_test "output_resolution_normalization" test_output_resolution_normalization
 run_test "process_alive_check" test_process_alive_check
 run_test "path_writable_check" test_path_writable_check
 run_test "json_file_atomic_write" test_json_file_atomic_write
+run_test "attempt_record_append" test_attempt_record_append
+run_test "verify_delegate_artifacts_valid_completed_run" test_verify_delegate_artifacts_valid_completed_run
 
 echo ""
 echo "========================================"

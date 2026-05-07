@@ -195,6 +195,7 @@ ATTEMPTS_LENGTH=$(echo "$ATTEMPTS" | jq 'length')
 
 STATUS_ATTEMPT_COUNT=$(echo "$STATUS" | jq -r '.attemptCount // 0')
 STATUS_RETRY_COUNT=$(echo "$STATUS" | jq -r '.retryCount // 0')
+STATUS_MAX_RETRY=$(echo "$STATUS" | jq -r '.maxRetryCount // 0')
 CONFIG_ATTEMPT_COUNT=$(echo "$CONFIG" | jq -r '.attemptCount // 0')
 CONFIG_RETRY_COUNT=$(echo "$CONFIG" | jq -r '.retryCount // 0')
 
@@ -218,9 +219,8 @@ if [[ $CONFIG_RETRY_COUNT -ne $STATUS_RETRY_COUNT ]]; then
     exit 1
 fi
 
-if [[ $STATUS_RETRY_COUNT -gt $MAX_RETRY_COUNT ]]; then
-    MAX_RETRY_COUNT=$(echo "$STATUS" | jq -r '.maxRetryCount // 0')
-    echo "Delegate retryCount ($STATUS_RETRY_COUNT) cannot exceed maxRetryCount ($MAX_RETRY_COUNT)." >&2
+if [[ $STATUS_RETRY_COUNT -gt $STATUS_MAX_RETRY ]]; then
+    echo "Delegate retryCount ($STATUS_RETRY_COUNT) cannot exceed maxRetryCount ($STATUS_MAX_RETRY)." >&2
     exit 1
 fi
 
@@ -273,7 +273,7 @@ ATTEMPT_PROPERTIES=("attempt" "sessionId" "resume" "retryReason" "exitCode" "saw
 
 for ((i=0; i<ATTEMPTS_LENGTH; i++)); do
     for prop in "${ATTEMPT_PROPERTIES[@]}"; do
-        if ! echo "$ATTEMPTS" | jq -e ".[$i].${prop}" >/dev/null 2>&1; then
+        if ! echo "$ATTEMPTS" | jq -e ".[$i] | has(\"${prop}\")" >/dev/null 2>&1; then
             echo "Delegate attempt[$i] is missing '$prop'." >&2
             exit 1
         fi
@@ -299,7 +299,7 @@ if [[ $ATTEMPTS_LENGTH -gt 0 ]]; then
         echo "Delegate config is missing initialSessionId." >&2
         exit 1
     fi
-    if ! has_json_field "$CONFIG" "initialResume"; then
+    if ! echo "$CONFIG" | jq -e 'has("initialResume")' >/dev/null 2>&1; then
         echo "Delegate config is missing initialResume." >&2
         exit 1
     fi
