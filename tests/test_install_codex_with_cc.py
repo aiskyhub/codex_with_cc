@@ -66,9 +66,9 @@ with tempfile.TemporaryDirectory(prefix="codex_with_cc_install_") as tmp:
     assert (workflow / "scripts" / "runtime.py").exists()
     assert (workflow / "scripts" / "test_delegate_runtime.py").exists()
     assert (source_skill / "scripts" / "runtime.py").exists()
-    installed_runtime = (workflow / "scripts" / "runtime.py").read_text(encoding="utf-8")
-    assert "docs/codex_with_cc/windows_scripts;docs/codex_with_cc" in installed_runtime
-    assert str(global_skill).replace("\\", "/") not in installed_runtime
+    installed_selftests = (workflow / "scripts" / "codex_with_cc_runtime" / "selftests.py").read_text(encoding="utf-8")
+    assert "docs/codex_with_cc/windows_scripts;docs/codex_with_cc" in installed_selftests
+    assert str(global_skill).replace("\\", "/") not in installed_selftests
     assert not (workflow / "scripts" / "__pycache__").exists()
     assert not (workflow / "tests").exists()
     assert (workflow / "windows_scripts" / "test_delegate_runtime.ps1").exists()

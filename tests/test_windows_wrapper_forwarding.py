@@ -2,6 +2,7 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -286,7 +287,46 @@ def test_windows_artifact_and_chain_wrappers_forward_to_python() -> None:
         assert array_chain.returncode == 0, array_chain.stdout + array_chain.stderr
 
 
+def test_installed_real_chain_scaffold_does_not_prefix_absolute_windows_paths() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_real_chain_scaffold_") as tmp:
+        root = Path(tmp)
+        codex_home = root / "codex-home"
+        target = root / "host-project"
+        target.mkdir()
+
+        install = subprocess.run(
+            [
+                sys.executable,
+                str(WORKFLOW / "scripts" / "install_codex_with_cc.py"),
+                "--target-root",
+                str(target),
+                "--platform",
+                "Windows",
+            ],
+            cwd=REPO,
+            text=True,
+            capture_output=True,
+            env={**os.environ, "CODEX_HOME": str(codex_home), "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+        assert install.returncode == 0, install.stdout + install.stderr
+
+        script = codex_home / "skills" / "codex-with-cc" / "windows_scripts" / "run_real_delegate_chain_validation.ps1"
+        result = run_pwsh(
+            script,
+            "-ValidationRoot",
+            str(root / "validation"),
+            "-Name",
+            "absolute-path-probe",
+            "-SessionKey",
+            "absolute-path-session",
+            env={"CODEX_HOME": str(codex_home)},
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert ".\\C:" not in result.stdout
+
+
 if __name__ == "__main__":
     test_delegate_wrapper_is_thin_and_forwards_to_python()
     test_windows_artifact_and_chain_wrappers_forward_to_python()
+    test_installed_real_chain_scaffold_does_not_prefix_absolute_windows_paths()
     print("windows wrapper forwarding tests passed")
