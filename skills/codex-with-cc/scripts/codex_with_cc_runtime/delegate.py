@@ -153,9 +153,6 @@ def run_delegate(ns: argparse.Namespace) -> int:
     for path in (output_path, status_path, config_path, raw_stream_path, trace_path):
         test_path_writable(path)
 
-    prompt = build_prompt(root, output_path, ns.mode, scope, tests, task_text)
-    write_text(prompt_path, prompt)
-
     config: dict[str, Any] = {
         "artifactSchema": ARTIFACT_SCHEMA_VERSION,
         "invocationContract": INVOCATION_CONTRACT,
@@ -208,6 +205,8 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "maxRetryCount": int(ns.max_retry_count),
         "attempts": [],
     }
+    prompt = build_prompt(root, output_path, run_id, ns.mode, scope, tests, task_text)
+    write_text(prompt_path, prompt)
     write_json(config_path, config)
     write_json(status_path, status)
 

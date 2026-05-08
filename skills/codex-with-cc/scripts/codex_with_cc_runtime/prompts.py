@@ -9,6 +9,7 @@ from .paths import script_ext, script_family, workflow_relative_path
 def build_prompt(
     repo: Path,
     output_path: Path,
+    run_id: str,
     mode: str,
     scope: list[str],
     tests: list[str],
@@ -40,6 +41,9 @@ Repository root:
 Delegated output report path:
 {output_path}
 
+Current delegate run id:
+{run_id}
+
 Mode:
 {mode}
 
@@ -51,6 +55,9 @@ Required or expected verification:
 
 Worker protocol:
 {worker_protocol_text}
+- If a task or verification command contains a placeholder like `<...-run-id>`, replace it with the current delegate run id `{run_id}` before you execute the command.
+- Never inspect, poll, or wait on the current run's own live artifacts (`status_{run_id}.json`, `stream_{run_id}.jsonl`, `trace_{run_id}.log`, `config_{run_id}.json`, `prompt_{run_id}.md`, `claude_{run_id}.md`) as task input. Those files belong to the wrapper for this run, not to the delegated task.
+- Never add sleeps or "wait for completion" loops for the current run. You are the current run; finish the delegated task and emit the required report directly.
 
 Task:
 {task_text}
