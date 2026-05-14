@@ -21,14 +21,17 @@ from .paths import repo_root, workflow_relative_path, workflow_root
 from .prompts import build_prompt
 from .reports import build_report_repair_prompt, get_output_resolution, path_has_required_report_headings
 from .sessions import SessionLease, acquire_session_lease, effective_session_key, normalize_delegate_list, release_session_lease, reset_session_lease_for_fresh_session, safe_session_key, task_fingerprint
+from .workflow import new_workflow_id, normalize_role, role_for_mode, safe_task_id, update_workflow_record, workflow_path
 
 
 
-def startup_failure_report(message: str) -> str:
+def startup_failure_report(message: str, role: str = "reviewer") -> str:
     summary = f"STARTUP_FAILURE: {message}"
-    return f"""Process Log
-- Delegate worker failed before Claude Code execution started.
-- Startup failure: {message}
+    return f"""Status
+FAIL
+
+Role
+{role}
 
 Summary
 The delegate run did not reach Claude Code execution.
@@ -39,8 +42,12 @@ None
 Verification
 - not run; delegate startup failed before worker execution
 
+Findings
+- Delegate worker failed before Claude Code execution started.
+- Startup failure: {message}
+
 Final Result
-FAIL / NEED_HUMAN_INTERVENTION
+FAIL
 {summary}
 
 Risks Or Follow-ups
@@ -49,10 +56,12 @@ Risks Or Follow-ups
 
 
 
-def dry_run_report(run_id: str, prompt_path: Path) -> str:
-    return f"""Process Log
-- Dry run enabled; Claude Code was not invoked.
-- Delegate prompt and audit artifacts were generated for inspection.
+def dry_run_report(run_id: str, prompt_path: Path, role: str) -> str:
+    return f"""Status
+DONE
+
+Role
+{role}
 
 Summary
 Delegate dry run completed without executing Claude Code.
@@ -63,8 +72,12 @@ None
 Verification
 - dry-run artifact generation completed for RunId {run_id}
 
+Findings
+- Dry run enabled; Claude Code was not invoked.
+- Delegate prompt and audit artifacts were generated for inspection.
+
 Final Result
-PASS
+DONE
 
 Risks Or Follow-ups
 - Inspect the generated prompt before running without -DryRun if needed: {prompt_path}
@@ -83,7 +96,7 @@ def complete_startup_failure(
     status: dict[str, Any],
 ) -> None:
     failure = f"STARTUP_FAILURE: {failure_message}"
-    write_text(output_path, startup_failure_report(failure_message))
+    write_text(output_path, startup_failure_report(failure_message, str(config.get("role") or "reviewer")))
     if not raw_stream_path.exists():
         write_text(raw_stream_path, "")
     if not trace_path.exists():
@@ -162,6 +175,9 @@ def run_delegate(ns: argparse.Namespace) -> int:
     session_state_lock_path = session_pools_root / f"{safe_key}.lock"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
     run_id = f"{timestamp}_{uuid.uuid4().hex[:8]}"
+    workflow_id = ns.workflow_id.strip() if ns.workflow_id and ns.workflow_id.strip() else new_workflow_id(key)
+    task_id = safe_task_id(ns.task_id) if ns.task_id and ns.task_id.strip() else safe_task_id(f"task-{run_id}")
+    role = normalize_role(ns.role) if ns.role and ns.role.strip() else role_for_mode(ns.mode)
     effective_name = ns.name if ns.name else f"{ns.name_prefix}-{run_id}"
     if output_path.name == "claude_PLACEHOLDER.md":
         output_path = artifact_root / f"claude_{run_id}.md"
@@ -170,6 +186,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
     prompt_path = artifact_root / f"prompt_{run_id}.md"
     raw_stream_path = artifact_root / f"stream_{run_id}.jsonl"
     trace_path = artifact_root / f"trace_{run_id}.log"
+    workflow_file_path = workflow_path(artifact_root, workflow_id)
     lock_path = artifact_root / "delegate.lock"
     fingerprint = task_fingerprint(task_text, scope, tests, ns.mode)
 
@@ -182,6 +199,9 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "childThreadMarkerName": CHILD_MARKER_NAME,
         "childThreadMarkerValidated": True,
         "runId": run_id,
+        "workflowId": workflow_id,
+        "taskId": task_id,
+        "role": role,
         "repoRoot": str(root),
         "workflowRoot": str(workflow_root()),
         "workflowRelativePath": rel,
@@ -197,6 +217,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "statusPath": str(status_path),
         "rawStreamPath": str(raw_stream_path),
         "tracePath": str(trace_path),
+        "workflowPath": str(workflow_file_path),
         "lockPath": str(lock_path),
         "taskFile": str(Path(ns.task_file).resolve()) if ns.task_file else None,
         "maxBudgetUsd": str(ns.max_budget_usd) if ns.max_budget_usd not in (None, "") else None,
@@ -214,12 +235,16 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "childThreadMarkerName": CHILD_MARKER_NAME,
         "childThreadMarkerValidated": True,
         "runId": run_id,
+        "workflowId": workflow_id,
+        "taskId": task_id,
+        "role": role,
         "status": "starting",
         "pid": os.getpid(),
         "outputPath": str(output_path),
         "promptPath": str(prompt_path),
         "rawStreamPath": str(raw_stream_path),
         "tracePath": str(trace_path),
+        "workflowPath": str(workflow_file_path),
         "linesWritten": 0,
         "outputBytes": 0,
         "exitCode": None,
@@ -228,7 +253,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "maxRetryCount": int(ns.max_retry_count),
         "attempts": [],
     }
-    prompt = build_prompt(root, output_path, run_id, ns.mode, scope, tests, task_text)
+    prompt = build_prompt(root, output_path, run_id, ns.mode, scope, tests, task_text, workflow_id=workflow_id, task_id=task_id, role=role)
     write_text(prompt_path, prompt)
     write_json(config_path, config)
     write_json(status_path, status)
@@ -305,7 +330,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
 
         if ns.dry_run:
             print("Dry run enabled; Claude Code was not invoked.")
-            write_text(output_path, dry_run_report(run_id, prompt_path))
+            write_text(output_path, dry_run_report(run_id, prompt_path, role))
             write_text(raw_stream_path, "")
             write_text(trace_path, f"[dry-run] Claude Code was not invoked for run {run_id}\n")
             status["attemptCount"] = 1
@@ -442,20 +467,22 @@ def run_delegate(ns: argparse.Namespace) -> int:
                 final_text = str(capture_state.get("finalText") or "")
                 if not final_text.strip() and capture_state["assistantTexts"]:
                     final_text = str(capture_state["assistantTexts"][-1]).strip()
+                output_file_has_report = path_has_required_report_headings(output_path)
+                captured_report = bool(capture_state["capturedFinalResultHeading"]) or output_file_has_report
                 decision = retry_decision(
                     attempt_raw_lines,
                     lease.resume,
                     exit_code,
                     bool(capture_state["sawAssistantText"]),
                     bool(capture_state["sawResultSuccess"]),
-                    bool(capture_state["capturedFinalResultHeading"]),
+                    captured_report,
                 )
                 attempt_record.update(
                     {
                         "exitCode": exit_code,
                         "sawAssistantText": bool(capture_state["sawAssistantText"]),
                         "sawResultSuccess": bool(capture_state["sawResultSuccess"]),
-                        "capturedFinalResult": bool(capture_state["capturedFinalResultHeading"]),
+                        "capturedFinalResult": captured_report,
                         "sawStaleSessionText": bool(decision["sawStaleSessionText"]),
                         "sawStreamJsonVerboseError": bool(decision["sawStreamJsonVerboseError"]),
                     }
@@ -514,9 +541,11 @@ def run_delegate(ns: argparse.Namespace) -> int:
                     trace_handle.write("[failure] retry ceiling reached; forcing NEED_HUMAN_INTERVENTION\n")
                     trace_handle.write(f"[failure] {failure_summary_text}\n")
                     trace_handle.flush()
-                    final_text = f"""Process Log
-- Delegate worker detected a retryable Claude failure and exhausted the configured retry budget.
-- Automatic recovery stopped to avoid unbounded compute burn.
+                    final_text = f"""Status
+FAIL
+
+Role
+{role}
 
 Summary
 Automatic retry recovery hit the configured ceiling and requires human or Codex intervention.
@@ -527,8 +556,12 @@ None
 Verification
 - not run; the worker never reached a trustworthy execution state
 
+Findings
+- Delegate worker detected a retryable Claude failure and exhausted the configured retry budget.
+- Automatic recovery stopped to avoid unbounded compute burn.
+
 Final Result
-FAIL / NEED_HUMAN_INTERVENTION
+FAIL
 {failure_summary_text}
 
 Risks Or Follow-ups
@@ -599,6 +632,23 @@ Risks Or Follow-ups
             complete_startup_failure(str(exc), config_path, status_path, output_path, raw_stream_path, trace_path, config, status)
         raise
     finally:
+        with contextlib.suppress(Exception):
+            update_workflow_record(
+                artifact_root,
+                workflow_id,
+                task_id,
+                role,
+                scope,
+                tests,
+                run_id,
+                config_path,
+                status_path,
+                output_path,
+                prompt_path,
+                raw_stream_path,
+                trace_path,
+                str(status.get("status") or "unknown"),
+            )
         release_session_lease(session_state_path, session_state_lock_path, key, lease, run_id, fingerprint)
         if delegate_lock is not None:
             delegate_lock.release(remove=True)

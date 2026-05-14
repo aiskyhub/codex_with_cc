@@ -5,6 +5,13 @@ from pathlib import Path
 from .paths import script_ext, script_family, workflow_relative_path
 
 
+def role_template(role: str) -> str:
+    template = Path(__file__).resolve().parents[2] / "templates" / f"{role}.md"
+    if not template.exists():
+        return ""
+    return template.read_text(encoding="utf-8").strip()
+
+
 
 def build_prompt(
     repo: Path,
@@ -14,6 +21,9 @@ def build_prompt(
     scope: list[str],
     tests: list[str],
     task_text: str,
+    workflow_id: str,
+    task_id: str,
+    role: str,
 ) -> str:
     rel = workflow_relative_path()
     primary_entry = f"{rel}/{script_family()}/delegate_to_claude{script_ext()}"
@@ -21,11 +31,12 @@ def build_prompt(
     macos_entry = f"{rel}/macos_scripts/delegate_to_claude.sh"
     scope_text = "\n".join(f"- {item}" for item in scope) if scope else "- No explicit file scope was provided. Infer the narrowest safe scope from the task and current code."
     tests_text = "\n".join(f"- {item}" for item in tests) if tests else "- Run the smallest relevant verification you can identify from the change."
+    role_template_text = role_template(role) or "- Follow the generic codex-with-cc worker rules for this role."
     worker_protocol_text = f"""- This prompt is already the only allowed Claude worker context for this delegated run.
 - Never call `{primary_entry}`, `{windows_entry}`, `{macos_entry}`, `claude`, or `spawn_agent` recursively from inside this worker.
 - Treat `{rel}/CODEX_WITH_CC.md` as the workflow contract to inspect when the task scope requires it, not as an execution recipe for this worker.
 - If the task is an audit or validation, inspect the scoped files and run the listed verification commands directly instead of creating nested delegate runs.
-- If you think another delegate run is required, stop and explain why in `Final Result` instead of invoking it yourself.
+- If you think another delegate run is required, stop, set `Status` to `NEEDS_CONTEXT`, and explain why in `Findings` instead of invoking it yourself.
 """
     return f"""Execute the delegated task below now. This is not a readiness check; do not ask what to work on.
 
@@ -43,6 +54,15 @@ Delegated output report path:
 
 Current delegate run id:
 {run_id}
+
+Workflow id:
+{workflow_id}
+
+Task id:
+{task_id}
+
+Worker role:
+{role}
 
 Mode:
 {mode}
@@ -62,6 +82,9 @@ Worker protocol:
 - Never inspect, poll, or wait on the current run's own live artifacts (`status_{run_id}.json`, `stream_{run_id}.jsonl`, `trace_{run_id}.log`, `config_{run_id}.json`, `prompt_{run_id}.md`, `claude_{run_id}.md`) as task input. Those files belong to the wrapper for this run, not to the delegated task.
 - Never add sleeps or "wait for completion" loops for the current run. You are the current run; finish the delegated task and emit the required report directly.
 
+Role template:
+{role_template_text}
+
 Task:
 {task_text}
 
@@ -76,10 +99,13 @@ Hard requirements:
 - Never claim verification passed unless you actually ran the command and saw it pass.
 - Process and summarize your own CLI output. The Codex child thread will forward your final structured result; it should not reinterpret long logs for you.
 - Treat this script as a child-thread worker entry only. Do not reinterpret it as permission for the Codex main thread to invoke Claude directly.
-- Write enough detail in Process Log for the user to understand what happened, but keep raw verbose command output in the transcript/log instead of duplicating it.
-- Finish with this exact report skeleton. Do not add text before `Process Log`; do not bold or decorate these headings:
-Process Log
-- <what you did>
+- Keep raw verbose command output in the transcript/log instead of duplicating it.
+- Finish with this exact report skeleton. Do not add text before `Status`; do not bold or decorate these headings:
+Status
+<DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED, or FAIL>
+
+Role
+{role}
 
 Summary
 <brief result>
@@ -90,8 +116,11 @@ Changed Files
 Verification
 - <command and outcome>
 
+Findings
+- <finding or None>
+
 Final Result
-<PASS, FAIL, or blocked result>
+<repeat the exact Status token>
 
 Risks Or Follow-ups
 - <risk or None>

@@ -1,0 +1,3 @@
+- Make only the scoped code or documentation changes assigned to this task.
+- Run the required verification commands and fix failures caused by the task.
+- Return `DONE_WITH_CONCERNS` when the work passes but has residual risks.

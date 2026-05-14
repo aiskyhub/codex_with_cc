@@ -4,7 +4,7 @@ import argparse
 import sys
 from typing import Callable
 
-from .artifacts import run_verify_artifacts, run_verify_chain
+from .artifacts import run_verify_artifacts, run_verify_chain, run_verify_workflow
 from .common import DelegateError
 from .delegate import run_delegate
 from .real_chain import run_real_chain_validation
@@ -46,6 +46,9 @@ def add_delegate_args(parser: argparse.ArgumentParser) -> None:
     task_group.add_argument("-TaskFile", dest="task_file")
     parser.add_argument("-Scope", dest="scope", action="append", default=[])
     parser.add_argument("-Tests", dest="tests", action="append", default=[])
+    parser.add_argument("-WorkflowId", dest="workflow_id")
+    parser.add_argument("-TaskId", dest="task_id")
+    parser.add_argument("-Role", dest="role")
     parser.add_argument("-Mode", dest="mode", type=choice_arg(["Implement", "Fix", "Review"]), default="Implement")
     parser.add_argument("-Model", dest="model", default="sonnet")
     parser.add_argument("-Name", dest="name")
@@ -79,6 +82,16 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("-RunId", dest="run_id", required=True)
     verify.add_argument("-ArtifactRoot", dest="artifact_root")
     verify.set_defaults(func=run_verify_artifacts)
+
+    verify_run = sub.add_parser("verify-run")
+    verify_run.add_argument("-RunId", dest="run_id", required=True)
+    verify_run.add_argument("-ArtifactRoot", dest="artifact_root")
+    verify_run.set_defaults(func=run_verify_artifacts)
+
+    workflow = sub.add_parser("verify-workflow")
+    workflow.add_argument("-WorkflowId", dest="workflow_id", required=True)
+    workflow.add_argument("-ArtifactRoot", dest="artifact_root")
+    workflow.set_defaults(func=run_verify_workflow)
 
     chain = sub.add_parser("verify-chain")
     chain.add_argument("-ArtifactRoot", dest="artifact_root", required=True)

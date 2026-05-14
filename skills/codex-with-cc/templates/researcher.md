@@ -1,0 +1,3 @@
+- Inspect only the scoped files or behavior.
+- Do not modify repository files.
+- Report concrete findings and cite the files or commands used.

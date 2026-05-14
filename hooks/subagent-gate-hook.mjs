@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const REQUIRED_MODEL = "gpt-5.3-codex";
 const REQUIRED_EFFORT = "medium";
+const ALLOWED_ROLES = new Set(["planner", "implementer", "researcher", "reviewer", "final-verifier"]);
 
 const TRIGGER_PATTERNS = [
   /child[- ]?agent/i,
@@ -184,6 +185,31 @@ function hasTaskFile(serialized) {
   return /(?:^|[\s"'])(?:-TaskFile|--task-file)\b/i.test(serialized);
 }
 
+function hasWorkflowId(serialized) {
+  return /(?:^|[\s"'])(?:-WorkflowId|--workflow-id)\b/i.test(serialized);
+}
+
+function hasTaskId(serialized) {
+  return /(?:^|[\s"'])(?:-TaskId|--task-id)\b/i.test(serialized);
+}
+
+function roleValue(serialized) {
+  const match = serialized.match(/(?:^|[\s"'])(?:-Role|--role)\s+["']?([A-Za-z-]+)/i);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function hasRole(serialized) {
+  return /(?:^|[\s"'])(?:-Role|--role)\b/i.test(serialized);
+}
+
+function hasScope(serialized) {
+  return /(?:^|[\s"'])(?:-Scope|--scope)\b/i.test(serialized);
+}
+
+function hasAllowParallel(serialized) {
+  return /(?:^|[\s"'])-(?:AllowParallel)\b|(?:^|[\s"'])--allow-parallel\b/i.test(serialized);
+}
+
 function hasForbiddenEffort(serialized) {
   return /(?:^|[\s"'])--effort\b/i.test(serialized);
 }
@@ -217,6 +243,21 @@ function validateWorkflowPayload(payload) {
   if (!hasTaskFile(serialized)) {
     problems.push("-TaskFile is required");
   }
+  if (!hasWorkflowId(serialized) && !prop(payload, "workflow_id", "workflowId")) {
+    problems.push("-WorkflowId is required");
+  }
+  if (!hasTaskId(serialized) && !prop(payload, "task_id", "taskId")) {
+    problems.push("-TaskId is required");
+  }
+  const role = String(prop(payload, "role", "role") || roleValue(serialized) || "").toLowerCase();
+  if (!hasRole(serialized) && !role) {
+    problems.push("-Role is required");
+  } else if (!ALLOWED_ROLES.has(role)) {
+    problems.push(`-Role must be one of ${Array.from(ALLOWED_ROLES).join(", ")}`);
+  }
+  if (hasAllowParallel(serialized) && !hasScope(serialized)) {
+    problems.push("-Scope is required when -AllowParallel is used");
+  }
   if (hasForbiddenEffort(serialized)) {
     problems.push("delegate_to_claude.* must not pass --effort");
   }
@@ -243,6 +284,20 @@ function handlePreToolUse(input) {
       }
       if (!hasTaskFile(serialized)) {
         problems.push("-TaskFile is required");
+      }
+      if (!hasWorkflowId(serialized)) {
+        problems.push("-WorkflowId is required");
+      }
+      if (!hasTaskId(serialized)) {
+        problems.push("-TaskId is required");
+      }
+      if (!hasRole(serialized)) {
+        problems.push("-Role is required");
+      } else if (!ALLOWED_ROLES.has(roleValue(serialized))) {
+        problems.push(`-Role must be one of ${Array.from(ALLOWED_ROLES).join(", ")}`);
+      }
+      if (hasAllowParallel(serialized) && !hasScope(serialized)) {
+        problems.push("-Scope is required when -AllowParallel is used");
       }
       if (hasForbiddenEffort(serialized)) {
         problems.push("delegate_to_claude.* must not pass --effort");

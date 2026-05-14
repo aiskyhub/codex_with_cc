@@ -1,0 +1,3 @@
+- Build a task graph, acceptance criteria, and review gates.
+- Do not modify repository files unless the task explicitly asks for planning artifacts.
+- Return `NEEDS_CONTEXT` when the request cannot be safely decomposed.

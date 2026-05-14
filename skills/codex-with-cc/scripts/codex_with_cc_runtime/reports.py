@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .common import REPORT_HEADINGS
+from .common import REPORT_HEADINGS, REPORT_STATUS_VALUES
 from .io_utils import read_text
 
 
@@ -13,6 +13,30 @@ def test_final_result_heading(text: str | None) -> bool:
     if not text or not text.strip():
         return False
     return report_heading_match(text, "Final Result") is not None
+
+
+def report_section(text: str, heading: str) -> str:
+    text = _text_outside_fenced_blocks(text)
+    match = report_heading_match(text, heading)
+    if match is None:
+        return ""
+    start = match.end()
+    next_positions = [
+        next_match.start()
+        for item in REPORT_HEADINGS
+        if item != heading
+        for next_match in [report_heading_match(text[start:], item)]
+        if next_match is not None
+    ]
+    end = start + min(next_positions) if next_positions else len(text)
+    return text[start:end].strip()
+
+
+def parse_report_status(text: str | None) -> str:
+    if not text:
+        return ""
+    status = report_section(text, "Status").splitlines()[0].strip().upper() if report_section(text, "Status") else ""
+    return status if status in REPORT_STATUS_VALUES else ""
 
 
 
@@ -53,7 +77,7 @@ def text_has_required_report_headings(text: str | None) -> bool:
         if match is None:
             return False
         positions.append(match.start())
-    return positions == sorted(positions)
+    return positions == sorted(positions) and bool(parse_report_status(text))
 
 
 
@@ -83,9 +107,11 @@ def convert_unstructured_final_text(text: str | None) -> str:
         return ""
     if text_has_required_report_headings(trimmed):
         return trimmed
-    return f"""Process Log
-- Claude Code exited successfully but did not produce the required delegate report headings.
-- The delegate wrapper rejected that unstructured response and preserved it below for audit.
+    return f"""Status
+FAIL
+
+Role
+reviewer
 
 Summary
 Claude Code did not satisfy the delegate report contract. Treat this run as failed even though the Claude CLI process exited with code 0.
@@ -96,8 +122,12 @@ Unknown from unstructured response; inspect repository diff and raw delegate art
 Verification
 Unknown from unstructured response; do not treat verification as proven unless the original response below lists exact commands and outcomes.
 
+Findings
+- Claude Code exited successfully but did not produce the required delegate report headings.
+- The delegate wrapper rejected that unstructured response and preserved it below for audit.
+
 Final Result
-UNSTRUCTURED_SUCCESS_REJECTED
+FAIL
 {trimmed}
 
 Risks Or Follow-ups
@@ -149,10 +179,13 @@ If the previous response is missing detail, state that limitation inside the req
 Write the report to this path if you choose to write a file, and also return the report as your final response:
 {output_path}
 
-Your final response must start with `Process Log` on the first line and must include exactly these headings in this order:
+Your final response must start with `Status` on the first line and must include exactly these headings in this order:
 
-Process Log
-- <what you did>
+Status
+<DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED, or FAIL>
+
+Role
+<planner, implementer, researcher, reviewer, or final-verifier>
 
 Summary
 <brief result>
@@ -163,8 +196,11 @@ Changed Files
 Verification
 - <command and outcome>
 
+Findings
+- <finding or None>
+
 Final Result
-<PASS, FAIL, or blocked result>
+<same status token as Status>
 
 Risks Or Follow-ups
 - <risk or None>

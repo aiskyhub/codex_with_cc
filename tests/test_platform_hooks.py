@@ -108,7 +108,8 @@ def test_pre_tool_use_allows_compliant_spawn_agent_payload() -> None:
                 "message": (
                     "Set CODEX_CLAUDE_CHILD_THREAD=1, then run "
                     "windows_scripts/delegate_to_claude.ps1 -TaskFile "
-                    ".codex/codex_with_cc/tasks/20260514/120000000-task.md"
+                    ".codex/codex_with_cc/tasks/20260514/120000000-task.md "
+                    "-WorkflowId wf-a -TaskId task-a -Role researcher -Scope skills/codex-with-cc"
                 ),
                 "model": "gpt-5.3-codex",
                 "reasoning_effort": "medium",

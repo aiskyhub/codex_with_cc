@@ -1,0 +1,3 @@
+- Review changed files, report structure, verification evidence, and risks.
+- Do not make unrelated edits during review.
+- Return `FAIL` for invalid evidence and `DONE_WITH_CONCERNS` for accepted work with risks.

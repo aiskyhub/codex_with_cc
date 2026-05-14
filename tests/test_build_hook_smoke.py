@@ -77,6 +77,14 @@ def delegate_command(workflow_root: Path, task_file: Path, artifact_root: Path) 
             str(script),
             "-TaskFile",
             str(task_file),
+            "-WorkflowId",
+            "wf-smoke",
+            "-TaskId",
+            "task-smoke",
+            "-Role",
+            "researcher",
+            "-Scope",
+            "AGENTS.md",
             "-ArtifactRoot",
             str(artifact_root),
             "-SessionMode",
@@ -89,6 +97,7 @@ def delegate_command(workflow_root: Path, task_file: Path, artifact_root: Path) 
             "$env:CODEX_CLAUDE_CHILD_THREAD = '1'; "
             f'pwsh -NoProfile -File "{script.as_posix()}" '
             f'-TaskFile "{task_file.as_posix()}" '
+            "-WorkflowId wf-smoke -TaskId task-smoke -Role researcher -Scope AGENTS.md "
             f'-ArtifactRoot "{artifact_root.as_posix()}" '
             "-SessionMode PrimaryReuse -SessionKey smoke -DryRun"
         )
@@ -99,6 +108,14 @@ def delegate_command(workflow_root: Path, task_file: Path, artifact_root: Path) 
         str(script),
         "-TaskFile",
         str(task_file),
+        "-WorkflowId",
+        "wf-smoke",
+        "-TaskId",
+        "task-smoke",
+        "-Role",
+        "researcher",
+        "-Scope",
+        "AGENTS.md",
         "-ArtifactRoot",
         str(artifact_root),
         "-SessionMode",
@@ -111,6 +128,7 @@ def delegate_command(workflow_root: Path, task_file: Path, artifact_root: Path) 
         "export CODEX_CLAUDE_CHILD_THREAD=1; "
         f'"{script.as_posix()}" '
         f'-TaskFile "{task_file.as_posix()}" '
+        "-WorkflowId wf-smoke -TaskId task-smoke -Role researcher -Scope AGENTS.md "
         f'-ArtifactRoot "{artifact_root.as_posix()}" '
         "-SessionMode PrimaryReuse -SessionKey smoke -DryRun"
     )
