@@ -54,8 +54,11 @@ def make_fake_claude_bin(root: Path) -> Path:
     fake_bin.mkdir(parents=True, exist_ok=True)
     report = "\n".join(
         (
-            "Process Log",
-            "- inspected the wrapper chain",
+            "Status",
+            "DONE",
+            "",
+            "Role",
+            "implementer",
             "",
             "Summary",
             "Fake Claude completed the wrapper test.",
@@ -66,8 +69,11 @@ def make_fake_claude_bin(root: Path) -> Path:
             "Verification",
             "- fake verification passed",
             "",
+            "Findings",
+            "- inspected the wrapper chain",
+            "",
             "Final Result",
-            "PASS",
+            "DONE",
             "",
             "Risks Or Follow-ups",
             "None",

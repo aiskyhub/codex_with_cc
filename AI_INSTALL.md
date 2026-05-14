@@ -19,6 +19,19 @@
 
 把本仓库的 `Codex -> Codex 子代理 -> Claude Code CLI` 委派工作流，安装成 `aiskyhub/aiskyhub` marketplace 下的用户级插件，使后续凡是涉及子代理、子线程、多代理、委派、派工或执行层的任务，都强制触发 `$codex-with-cc`。
 
+## 内部协议
+
+安装入口和 marketplace 插件名保持不变，插件内部直接使用 workflow/task/run 协议：
+
+- 每次用户请求对应一个 `WorkflowId`。
+- 每个被拆出的子任务对应一个 `TaskId`。
+- 每次 Claude Code 执行对应一个 `RunId`。
+- 每个 worker 必须声明 `Role`，取值为 `planner`、`implementer`、`researcher`、`reviewer` 或 `final-verifier`。
+- 当前 artifact schema 会额外生成 `workflow_<WorkflowId>.json`，用于聚合 workflow 下的 task 和 run。
+- 单次运行使用 `verify_delegate_run` 或 `verify_delegate_artifacts` 验证；整条工作流使用 `verify_delegate_workflow` 验证。
+
+这属于内部协议替换，不改变 README 中原有的中文安装口令，也不改变 `codex-with-cc@aiskyhub` 用户级安装路径。
+
 Any user mention of child-agent, subagent, sub-agent, child-thread, subthread, delegation, worker-execution, or Chinese equivalents such as 子代理、子线程、多代理、委派、派工、执行层 is a workflow trigger.
 
 触发后必须走：
@@ -175,6 +188,10 @@ codex_hooks = true
 $env:CODEX_CLAUDE_CHILD_THREAD = '1'
 pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\delegate_to_claude.ps1" `
   -TaskFile .\.codex\codex_with_cc\tasks\<yyyyMMdd>\<HHmmssfff>-<short-id>-<task-file>.md `
+  -WorkflowId <workflow-id> `
+  -TaskId <task-id> `
+  -Role implementer `
+  -Scope <changed-or-inspected-path> `
   -SessionMode PrimaryReuse `
   -SessionKey <stable-session-key> `
   -BypassPermissions
@@ -186,6 +203,10 @@ macOS 子线程标准调用形态：
 export CODEX_CLAUDE_CHILD_THREAD=1
 "<installed-workflow-root>/macos_scripts/delegate_to_claude.sh" \
   -TaskFile ./.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md \
+  -WorkflowId <workflow-id> \
+  -TaskId <task-id> \
+  -Role implementer \
+  -Scope <changed-or-inspected-path> \
   -SessionMode PrimaryReuse \
   -SessionKey <stable-session-key> \
   -BypassPermissions
@@ -208,6 +229,7 @@ export CODEX_CLAUDE_CHILD_THREAD=1
 
 常见文件包括：
 
+- `workflow_<WorkflowId>.json`
 - `claude_<RunId>.md`
 - `status_<RunId>.json`
 - `config_<RunId>.json`
@@ -220,10 +242,22 @@ export CODEX_CLAUDE_CHILD_THREAD=1
 
 ```powershell
 pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\verify_delegate_artifacts.ps1"
+pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\verify_delegate_run.ps1"
 ```
 
 ```bash
 "<installed-workflow-root>/macos_scripts/verify_delegate_artifacts.sh"
+"<installed-workflow-root>/macos_scripts/verify_delegate_run.sh"
+```
+
+检查整条 workflow：
+
+```powershell
+pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\verify_delegate_workflow.ps1" -WorkflowId <workflow-id>
+```
+
+```bash
+"<installed-workflow-root>/macos_scripts/verify_delegate_workflow.sh" -WorkflowId <workflow-id>
 ```
 
 检查多轮链路连续性：

@@ -22,7 +22,7 @@ def make_fake_claude_bin(root: Path, stdin_capture: Path) -> Path:
                 "content": [
                     {
                         "type": "text",
-                        "text": "Process Log\n- fake long prompt run\n\nSummary\nok\n\nChanged Files\nNone\n\nVerification\n- fake\n\nFinal Result\nPASS\n\nRisks Or Follow-ups\nNone",
+                        "text": "Status\nDONE\n\nRole\nimplementer\n\nSummary\nok\n\nChanged Files\nNone\n\nVerification\n- fake\n\nFindings\n- fake long prompt run\n\nFinal Result\nDONE\n\nRisks Or Follow-ups\nNone",
                     }
                 ],
             },

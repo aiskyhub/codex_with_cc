@@ -20,8 +20,11 @@ from codex_with_cc_runtime.sessions import task_fingerprint
 
 REPORT = "\n".join(
     (
-        "Process Log",
-        "- fake delegate execution",
+        "Status",
+        "DONE",
+        "",
+        "Role",
+        "implementer",
         "",
         "Summary",
         "Fake Claude completed.",
@@ -32,8 +35,11 @@ REPORT = "\n".join(
         "Verification",
         "- fake verification passed",
         "",
+        "Findings",
+        "- fake delegate execution",
+        "",
         "Final Result",
-        "PASS",
+        "DONE",
         "",
         "Risks Or Follow-ups",
         "None",
@@ -75,6 +81,45 @@ def make_fake_claude_bin(root: Path) -> Path:
             encoding="utf-8",
         )
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return fake_bin
+
+
+def make_file_report_fake_claude_bin(root: Path) -> Path:
+    fake_bin = root / "fake-file-report-claude-bin"
+    fake_bin.mkdir(parents=True, exist_ok=True)
+    script = fake_bin / "fake_file_report_claude.py"
+    script.write_text(
+        "\n".join(
+            (
+                "import json",
+                "import re",
+                "import sys",
+                "",
+                f"report = {REPORT!r}",
+                "prompt = sys.stdin.read()",
+                "match = re.search(r'Delegated output report path:\\n(.+)', prompt)",
+                "if not match:",
+                "    raise SystemExit('output path missing from prompt')",
+                "with open(match.group(1).strip(), 'w', encoding='utf-8') as handle:",
+                "    handle.write(report)",
+                "print(json.dumps({'type': 'assistant', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'Report written to delegated output path.'}]}}))",
+                "print(json.dumps({'type': 'result', 'subtype': 'success'}))",
+            )
+        ),
+        encoding="utf-8",
+    )
+    if os.name == "nt":
+        (fake_bin / "claude.cmd").write_text(
+            f'@echo off\n"{sys.executable}" "{script}"\n',
+            encoding="utf-8",
+        )
+    else:
+        shim = fake_bin / "claude"
+        shim.write_text(
+            f"#!/bin/sh\nexec '{sys.executable}' '{script}'\n",
+            encoding="utf-8",
+        )
+        shim.chmod(shim.stat().st_mode | stat.S_IEXEC)
     return fake_bin
 
 
@@ -151,6 +196,26 @@ def test_missing_claude_writes_complete_verifiable_failure_artifacts() -> None:
         assert "STARTUP_FAILURE: Claude Code CLI was not found" in output
 
 
+def test_structured_output_file_allows_unstructured_final_summary() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_file_report_") as tmp:
+        root = Path(tmp)
+        artifact_root = root / "artifacts"
+        fake_bin = make_file_report_fake_claude_bin(root)
+        result = run_delegate(
+            ["-Task", "write report file and summarize", "-BypassPermissions", "-MaxRetryCount", "0"],
+            artifact_root,
+            {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"},
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        run_id = run_id_from_output(result.stdout)
+
+        verified = verify_artifacts(run_id, artifact_root)
+
+        assert verified.returncode == 0, verified.stdout + verified.stderr
+        output = (artifact_root / f"claude_{run_id}.md").read_text(encoding="utf-8")
+        assert output == REPORT
+
+
 def test_task_fingerprint_uses_full_task_text() -> None:
     shared_prefix = "x" * 1000
     first = task_fingerprint(shared_prefix + "A", ["scope"], ["pytest"], "Implement")
@@ -161,7 +226,7 @@ def test_task_fingerprint_uses_full_task_text() -> None:
 
 def test_report_headings_ignore_fenced_code_examples() -> None:
     fenced_example = f"```text\n{REPORT}\n```"
-    decorated_report = "\n".join(f"**{line}**" if line in ("Process Log", "Summary", "Changed Files", "Verification", "Final Result", "Risks Or Follow-ups") else line for line in REPORT.splitlines())
+    decorated_report = "\n".join(f"**{line}**" if line in ("Status", "Role", "Summary", "Changed Files", "Verification", "Findings", "Final Result", "Risks Or Follow-ups") else line for line in REPORT.splitlines())
 
     assert not text_has_required_report_headings(fenced_example)
     assert not text_has_required_report_headings(decorated_report)

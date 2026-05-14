@@ -6,18 +6,22 @@ from pathlib import Path
 from typing import Any
 
 
-ARTIFACT_SCHEMA_VERSION = 2
-INVOCATION_CONTRACT = "spawn_agent_child_only"
+ARTIFACT_SCHEMA_VERSION = 3
+INVOCATION_CONTRACT = "codex_with_cc_workflow"
 CHILD_MARKER_NAME = "CODEX_CLAUDE_CHILD_THREAD"
 CHILD_MARKER_VALUE = "1"
 REPORT_HEADINGS = (
-    "Process Log",
+    "Status",
+    "Role",
     "Summary",
     "Changed Files",
     "Verification",
+    "Findings",
     "Final Result",
     "Risks Or Follow-ups",
 )
+REPORT_STATUS_VALUES = ("DONE", "DONE_WITH_CONCERNS", "NEEDS_CONTEXT", "BLOCKED", "FAIL")
+WORKER_ROLES = ("planner", "implementer", "researcher", "reviewer", "final-verifier")
 SKILL_NAME = "codex-with-cc"
 
 

@@ -1,0 +1,3 @@
+- Verify the whole workflow and final acceptance criteria.
+- Check run artifacts and workflow artifacts before summarizing.
+- Do not claim completion unless verification actually ran or the blocker is explicit.

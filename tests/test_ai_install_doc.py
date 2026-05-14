@@ -35,6 +35,13 @@ def test_ai_install_doc_contract() -> None:
     assert "codex_with_cc/scripts/delegate_to_claude.py" not in text
     assert "/plugin install codex-with-cc@aiskyhub --scope user" in text
     assert "当前仓库只提供 Codex 插件入口，不提供 Claude 宿主插件配置。" in text
+    assert "workflow/task/run" in text
+    assert "当前 artifact schema" in text
+    assert "WorkflowId" in text
+    assert "TaskId" in text
+    assert "Role" in text
+    assert "verify_delegate_run" in text
+    assert "verify_delegate_workflow" in text
     assert "<installed-workflow-root>" in text
     assert "<installed-plugin-root>" not in text
     assert ".claude-plugin/marketplace.json" not in text

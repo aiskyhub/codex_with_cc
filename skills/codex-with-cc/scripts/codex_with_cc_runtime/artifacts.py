@@ -6,10 +6,11 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
-from .common import ARTIFACT_SCHEMA_VERSION, CHILD_MARKER_NAME, INVOCATION_CONTRACT, DelegateError, boolish, same_path
+from .common import ARTIFACT_SCHEMA_VERSION, CHILD_MARKER_NAME, INVOCATION_CONTRACT, REPORT_STATUS_VALUES, WORKER_ROLES, DelegateError, boolish, same_path
 from .io_utils import load_json
 from .paths import repo_root
-from .reports import path_has_required_report_headings
+from .reports import parse_report_status, path_has_required_report_headings
+from .workflow import workflow_path
 
 
 
@@ -49,6 +50,37 @@ def verify_artifacts(run_id: str, artifact_root_value: str | None) -> dict[str, 
         raise DelegateError(f"Delegate status is neither completed nor failed: {status_value}")
     if not path_has_required_report_headings(output_path):
         raise DelegateError(f"Delegate output does not contain the required report headings in order: {output_path}")
+    report_status = parse_report_status(output_path.read_text(encoding="utf-8"))
+    if report_status not in REPORT_STATUS_VALUES:
+        raise DelegateError(f"Delegate output has an invalid report status: {report_status}")
+    for prop in ("workflowId", "taskId", "role"):
+        if not str(config.get(prop) or "").strip():
+            raise DelegateError(f"Delegate config is missing {prop}.")
+        if not str(status.get(prop) or "").strip():
+            raise DelegateError(f"Delegate status is missing {prop}.")
+        if str(config.get(prop)) != str(status.get(prop)):
+            raise DelegateError(f"Delegate config/status {prop} mismatch.")
+    if str(config.get("role")) not in WORKER_ROLES:
+        raise DelegateError(f"Delegate config has invalid role: {config.get('role')}")
+    workflow_id = str(config.get("workflowId"))
+    workflow_file = workflow_path(root, workflow_id)
+    if not workflow_file.exists():
+        raise DelegateError(f"Missing workflow artifact: {workflow_file}")
+    workflow = load_json(workflow_file)
+    if int(workflow.get("artifactSchema", -1)) != ARTIFACT_SCHEMA_VERSION:
+        raise DelegateError(f"Unexpected workflow artifact schema. Expected {ARTIFACT_SCHEMA_VERSION}.")
+    if workflow.get("invocationContract") != INVOCATION_CONTRACT:
+        raise DelegateError(f"Unexpected workflow invocation contract. Expected '{INVOCATION_CONTRACT}'.")
+    if workflow.get("workflowId") != workflow_id:
+        raise DelegateError("Workflow artifact workflowId mismatch.")
+    if run_id not in (workflow.get("runs") or {}):
+        raise DelegateError(f"Workflow artifact does not reference run {run_id}.")
+    task_id = str(config.get("taskId"))
+    task = (workflow.get("tasks") or {}).get(task_id)
+    if not isinstance(task, dict):
+        raise DelegateError(f"Workflow artifact does not reference task {task_id}.")
+    if run_id not in list(task.get("runs") or []):
+        raise DelegateError(f"Workflow task {task_id} does not reference run {run_id}.")
     if completed and status.get("exitCode") is not None and int(status["exitCode"]) != 0:
         raise DelegateError(f"Delegate exitCode is not zero: {status['exitCode']}")
     if structured_failure and status.get("exitCode") is not None and int(status["exitCode"]) == 0:
@@ -139,13 +171,31 @@ def verify_artifacts(run_id: str, artifact_root_value: str | None) -> dict[str, 
         for slot in state.get("parallelPool") or []:
             if str(slot.get("leaseRunId")) == run_id:
                 raise DelegateError(f"Parallel session lease is still held by run {run_id}.")
-    return {"config": config, "status": status, "artifactRoot": root}
+    return {"config": config, "status": status, "workflow": workflow, "artifactRoot": root}
 
 
 
 def run_verify_artifacts(ns: argparse.Namespace) -> int:
     verify_artifacts(ns.run_id, ns.artifact_root)
     print(f"Artifact verification passed for RunId: {ns.run_id}")
+    return 0
+
+
+def run_verify_workflow(ns: argparse.Namespace) -> int:
+    root = Path(ns.artifact_root).resolve() if ns.artifact_root else (repo_root() / ".codex" / "codex_with_cc" / "claude-delegate").resolve()
+    path = workflow_path(root, ns.workflow_id)
+    if not path.exists():
+        raise DelegateError(f"Missing workflow artifact: {path}")
+    workflow = load_json(path)
+    if int(workflow.get("artifactSchema", -1)) != ARTIFACT_SCHEMA_VERSION:
+        raise DelegateError(f"Unexpected workflow artifact schema. Expected {ARTIFACT_SCHEMA_VERSION}.")
+    if workflow.get("invocationContract") != INVOCATION_CONTRACT:
+        raise DelegateError(f"Unexpected workflow invocation contract. Expected '{INVOCATION_CONTRACT}'.")
+    if workflow.get("workflowId") != ns.workflow_id:
+        raise DelegateError("Workflow artifact workflowId mismatch.")
+    for run_id in (workflow.get("runs") or {}).keys():
+        verify_artifacts(str(run_id), str(root))
+    print(f"Workflow verification passed for WorkflowId: {ns.workflow_id}")
     return 0
 
 

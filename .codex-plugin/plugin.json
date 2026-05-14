@@ -1,7 +1,7 @@
 {
   "name": "codex-with-cc",
   "version": "1.0.1",
-  "description": "A Codex plugin for delegating Codex child-agent work to Claude Code CLI.",
+  "description": "A Codex plugin for delegating Codex child-agent work to Claude Code CLI with workflow artifacts.",
   "author": {
     "name": "xdd666t"
   },
@@ -19,7 +19,7 @@
   "interface": {
     "displayName": "Codex With CC",
     "shortDescription": "Codex plugin for the Claude Code delegation workflow.",
-    "longDescription": "Routes Codex main thread planning into Codex child-agent execution that is handed off to Claude Code CLI, and is distributed marketplace-first through aiskyhub/aiskyhub for Codex installations.",
+    "longDescription": "Routes Codex main thread planning into staged Codex child-agent execution that is handed off to Claude Code CLI with workflow/task/run artifacts, and is distributed marketplace-first through aiskyhub/aiskyhub for Codex installations.",
     "developerName": "xdd666t",
     "category": "Development",
     "capabilities": [
@@ -28,7 +28,7 @@
     ],
     "defaultPrompt": [
       "Use the codex-with-cc workflow to delegate child-agent implementation through Claude Code CLI.",
-      "Review this repository and explain how Codex main thread planning flows into Claude Code CLI execution.",
+      "Review this repository and explain how Codex main thread planning flows into workflow/task/run Claude Code CLI execution.",
       "Ensure the aiskyhub/aiskyhub marketplace is available, then install codex-with-cc@aiskyhub for user scope."
     ]
   }

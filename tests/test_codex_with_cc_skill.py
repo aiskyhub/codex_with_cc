@@ -5,6 +5,13 @@ import re
 
 repo = Path(__file__).resolve().parents[1]
 skill = repo / "skills" / "codex-with-cc"
+workflow_skill_names = (
+    "codex-with-cc-planning",
+    "codex-with-cc-dispatching",
+    "codex-with-cc-worker",
+    "codex-with-cc-reviewing",
+    "codex-with-cc-finishing",
+)
 skill_md = skill / "SKILL.md"
 openai_yaml = skill / "agents" / "openai.yaml"
 codex_plugin = repo / ".codex-plugin" / "plugin.json"
@@ -68,13 +75,18 @@ def test_codex_with_cc_skill_contract() -> None:
         "spawn_agent",
         "CODEX_CLAUDE_CHILD_THREAD=1",
         "delegate_to_claude",
+        "WorkflowId",
+        "TaskId",
+        "Role",
         "current working directory",
         "gpt-5.3-codex",
         "fork_context: false",
-        "Process Log",
+        "Status",
+        "Role",
         "Summary",
         "Changed Files",
         "Verification",
+        "Findings",
         "Final Result",
         "Risks Or Follow-ups",
     ):
@@ -87,3 +99,38 @@ def test_codex_with_cc_skill_contract() -> None:
     assert 'display_name: "Codex With CC"' in metadata
     assert 'default_prompt: "Use $codex-with-cc' in metadata
     assert "allow_implicit_invocation: true" in metadata
+
+    contract = (skill / "CODEX_WITH_CC.md").read_text(encoding="utf-8")
+    assert "workflow/task/run" in contract
+    assert "planner" in contract
+    assert "implementer" in contract
+    assert "researcher" in contract
+    assert "reviewer" in contract
+    assert "final-verifier" in contract
+    assert "workflow_<WorkflowId>.json" in contract
+
+    for skill_name in workflow_skill_names:
+        skill_file = repo / "skills" / skill_name / "SKILL.md"
+        assert skill_file.exists()
+        skill_text = skill_file.read_text(encoding="utf-8")
+        assert "codex-with-cc" in skill_text
+        assert "CODEX_WITH_CC.md" in skill_text
+
+
+def test_workflow_docs_do_not_expose_version_branding() -> None:
+    forbidden = ("v" + "2", "V" + "2", "v" + "3", "V" + "3", "codex_with_cc_" + "v" + "2")
+    scanned: list[Path] = []
+    for path in repo.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(repo)
+        if rel.parts[0] in {".git", "build", ".pytest_cache", "__pycache__"}:
+            continue
+        if any(part == "__pycache__" for part in rel.parts):
+            continue
+        scanned.append(rel)
+        haystack = rel.as_posix()
+        if path.suffix.lower() in {".md", ".py", ".js", ".json", ".yaml", ".yml", ".ps1", ".sh"}:
+            haystack += "\n" + path.read_text(encoding="utf-8")
+        for token in forbidden:
+            assert token not in haystack, f"unexpected version branding token {token!r} in {rel}"
