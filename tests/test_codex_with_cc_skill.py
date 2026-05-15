@@ -22,6 +22,7 @@ def test_codex_with_cc_skill_contract() -> None:
     assert (skill / "CODEX_WITH_CC.md").exists()
     assert (skill / "scripts" / "runtime.py").exists()
     assert (skill / "scripts" / "delegate_to_claude.py").exists()
+    assert (skill / "scripts" / "validate_delegate_task.py").exists()
     assert not (skill / "scripts" / "check_subagent_gate.py").exists()
     assert not (skill / "scripts" / "codex_with_cc_runtime" / "subagent_gate.py").exists()
     assert not (skill / "scripts" / f"{legacy_installer_stem}.py").exists()
@@ -30,7 +31,9 @@ def test_codex_with_cc_skill_contract() -> None:
     assert not (repo / f"{legacy_installer_stem}.sh").exists()
     assert not (repo / "tests" / f"test_{legacy_installer_stem}.py").exists()
     assert (skill / "windows_scripts" / "delegate_to_claude.ps1").exists()
+    assert (skill / "windows_scripts" / "validate_delegate_task.ps1").exists()
     assert (skill / "macos_scripts" / "delegate_to_claude.sh").exists()
+    assert (skill / "macos_scripts" / "validate_delegate_task.sh").exists()
     assert codex_plugin.exists()
     assert not (repo / ".claude-plugin" / "plugin.json").exists()
     assert "docs/codex_with_cc" not in (skill / "CODEX_WITH_CC.md").read_text(encoding="utf-8")
@@ -92,6 +95,8 @@ def test_codex_with_cc_skill_contract() -> None:
         "Operating Method",
         "spec compliance",
         "workflow-level verification",
+        "validate_delegate_task",
+        "final-verifier",
     ):
         assert required in text
     assert "check_subagent_gate" not in text
@@ -114,6 +119,8 @@ def test_codex_with_cc_skill_contract() -> None:
     assert "reviewer" in contract
     assert "final-verifier" in contract
     assert "workflow_<WorkflowId>.json" in contract
+    assert "validate_delegate_task" in contract
+    assert "final-verifier gate" in contract
 
     for skill_name in workflow_skill_names:
         skill_file = repo / "skills" / skill_name / "SKILL.md"

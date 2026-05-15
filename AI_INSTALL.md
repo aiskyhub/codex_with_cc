@@ -38,10 +38,12 @@ Codex 主线程 -> Codex spawn_agent 子线程 -> 已安装插件中的 delegate
 - 当前 artifact schema 会生成 `workflow_<WorkflowId>.json`，用于聚合 task、run、scope、verification、review gate 和 final acceptance。
 - 委派命令必须使用 task-file-only 形态：`-TaskFile`、`-WorkflowId`、`-TaskId`、`-Role`、`-SessionKey` 都是必填。
 - TaskFile 必须包含 `Goal`、`Allowed Scope`、`Forbidden Actions`、`Acceptance Criteria`、`Verification`、`Report Requirements`。
+- TaskFile 不能为空段、不能保留明显占位符，`Report Requirements` 必须列出完整报告标题；复杂任务派发前可先运行 `validate_delegate_task.*` 预检。
 - 旧式 inline `-Task`、旧式 `-Mode`、隐式 session key fallback 都不保留。
 - reviewer 必须额外传 `-ReviewForTaskId` 和 `-ReviewKind spec` 或 `-ReviewKind quality`。
 - worker 报告必须使用 `Status / Role / Summary / Changed Files / Verification / Findings / Final Result / Risks Or Follow-ups`，并且 `Status` 与 `Final Result` 必须一致。
 - 单次运行使用 `verify_delegate_run` 或 `verify_delegate_artifacts` 验证；整条工作流使用 `verify_delegate_workflow` 验证。
+- implementer workflow 必须有 accepted `spec` reviewer、accepted `quality` reviewer 和 accepted `final-verifier`；非 dry-run 的 `DONE` 报告必须覆盖所有 `-Tests` 命令和结果；并行 implementer 的 `-Scope` 不能重叠。
 
 插件声明 `./hooks/hooks.json`。宿主启用 Codex hooks 后，`SessionStart` 注入完整契约，`UserPromptSubmit` 遇到触发词时再次注入，`PreToolUse` 拦截直接 `claude`、主线程直接 `delegate_to_claude.*`、缺少 `CODEX_CLAUDE_CHILD_THREAD=1`、缺少 `-TaskFile`、缺少 workflow metadata、缺少 `-SessionKey`、旧式 `-Task`、旧式 `-Mode`、reviewer 缺少 review metadata、以及并行写任务无 `-Scope`。
 
@@ -208,6 +210,9 @@ Report Requirements
 - Status / Role / Summary / Changed Files / Verification / Findings / Final Result / Risks Or Follow-ups
 "@
 $env:CODEX_CLAUDE_CHILD_THREAD = '1'
+pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\validate_delegate_task.ps1" `
+  -TaskFile $taskFile `
+  -Role researcher
 pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\delegate_to_claude.ps1" `
   -TaskFile $taskFile `
   -WorkflowId install-check `
@@ -245,6 +250,9 @@ Verification
 Report Requirements
 - Status / Role / Summary / Changed Files / Verification / Findings / Final Result / Risks Or Follow-ups
 TASK
+CODEX_CLAUDE_CHILD_THREAD=1 "<installed-workflow-root>/macos_scripts/validate_delegate_task.sh" \
+  -TaskFile "$task_file" \
+  -Role researcher
 CODEX_CLAUDE_CHILD_THREAD=1 "<installed-workflow-root>/macos_scripts/delegate_to_claude.sh" \
   -TaskFile "$task_file" \
   -WorkflowId install-check \
@@ -332,6 +340,22 @@ reviewer 任务必须额外传：
 - `ParallelPool -AllowParallel`：独立支线任务池。
 
 只有任务范围互不冲突时才允许并行。多个子代理同时修改同一批文件时，必须拆分写入边界或改为串行。
+
+派发前预检 TaskFile：
+
+```powershell
+pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\validate_delegate_task.ps1" `
+  -TaskFile .\.codex\codex_with_cc\tasks\<yyyyMMdd>\<HHmmssfff>-<short-id>-<task-file>.md `
+  -Role implementer `
+  -Tests "pytest -q"
+```
+
+```bash
+"<installed-workflow-root>/macos_scripts/validate_delegate_task.sh" \
+  -TaskFile ./.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-file>.md \
+  -Role implementer \
+  -Tests "pytest -q"
+```
 
 ## 验证与产物
 

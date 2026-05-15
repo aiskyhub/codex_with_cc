@@ -18,9 +18,11 @@ Worker task files must use these exact sections:
 
 Worker behavior:
 
+- If the Goal, scope, acceptance criteria, or verification commands are unclear, stop before editing and report `NEEDS_CONTEXT`.
 - Execute the assigned task directly; do not create nested delegate runs.
 - Implementers must use test-first or the smallest equivalent verification-first evidence before changing behavior when the repository has a practical test surface.
 - Reviewers must perform exactly one review kind: `spec` or `quality`, for the provided `ReviewForTaskId`.
+- Reviewers must not trust worker reports; they must verify code, artifacts, scope, and evidence independently.
 - Keep noisy command output in artifacts and summarize only the evidence needed by the main thread.
 - Before reporting, check scope compliance, changed files, verification results, and residual risks.
 - Use `DONE_WITH_CONCERNS` only when required verification passed but meaningful risk remains.

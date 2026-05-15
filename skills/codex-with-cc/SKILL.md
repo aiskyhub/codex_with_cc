@@ -29,12 +29,13 @@ The installed plugin also declares `./hooks/hooks.json` so Codex hosts with hook
 
 Use this workflow as a Superpowers-style staged control loop, not as a prompt shortcut:
 
-1. Clarify intent and acceptance criteria before dispatch.
-2. Write bounded task files with `Goal`, `Allowed Scope`, `Forbidden Actions`, `Acceptance Criteria`, `Verification`, and `Report Requirements`.
-3. Dispatch fresh child threads with `model: gpt-5.3-codex`, `reasoning_effort: medium`, and `fork_context: false`.
-4. Require implementers to use test-first or verification-first evidence when changing behavior.
-5. Review every implementation in two passes: spec compliance first, then code quality and regression risk.
-6. Finish only after workflow-level verification confirms run artifacts, workflow artifacts, review gates, session continuity when relevant, and repository tests support acceptance.
+1. Design gate: clarify intent, constraints, success criteria, and acceptance evidence before dispatch.
+2. Plan gate: split work into bounded task files with `Goal`, `Allowed Scope`, `Forbidden Actions`, `Acceptance Criteria`, `Verification`, and `Report Requirements`.
+3. Task validation gate: run `validate_delegate_task.*` when preparing task files or when scope/review metadata is easy to get wrong.
+4. Dispatch gate: use fresh child threads with `model: gpt-5.3-codex`, `reasoning_effort: medium`, and `fork_context: false`.
+5. Implementer gate: require test-first or verification-first evidence when changing behavior.
+6. Review gate: review every implementation in two passes, spec compliance first, then code quality and regression risk.
+7. Final-verifier gate: finish only after workflow-level verification confirms run artifacts, workflow artifacts, accepted review gates, final-verifier evidence, parallel scope safety, session continuity when relevant, and repository tests support acceptance.
 
 Workers are context consumers, not decision owners. Codex main thread owns architecture, task boundaries, acceptance, rework decisions, and final delivery.
 
@@ -46,8 +47,9 @@ The Codex child thread must:
 - Avoid legacy inline `-Task`, legacy `-Mode`, and implicit session-key fallback.
 - Keep changes inside the delegated scope and pass `-Scope` for any parallel writable work.
 - Run the requested verification.
+- Ensure any command passed through `-Tests` appears with an outcome in the worker's `Verification` report.
 
-Task files that omit the required sections are rejected before Claude Code starts. This keeps worker context explicit and removes the old one-line prompt path.
+Task files that omit required sections, leave sections empty, keep obvious placeholders, or omit required report headings are rejected before Claude Code starts. This keeps worker context explicit and removes the old one-line prompt path.
 
 ## Multi-Skill Chain
 
@@ -71,6 +73,8 @@ In the main Codex thread:
 - Verify each run with `verify_delegate_run.*` or `verify_delegate_artifacts.*`.
 - Verify the whole workflow with `verify_delegate_workflow.*`; use `verify_delegate_chain.*` when validating primary/parallel session continuity.
 - Reject implementer work until both `spec` and `quality` reviewer runs are accepted.
+- Reject implementer workflows without an accepted `final-verifier` task.
+- Reject parallel implementer runs whose writable scopes overlap.
 - Do not summarize a worker as successful until the artifacts and the worker's verification evidence both support that claim.
 
 ## Worker Report Contract

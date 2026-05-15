@@ -27,8 +27,10 @@ const FALLBACK_CONTEXT = [
   "- Required chain: Codex main thread -> Codex spawn_agent child thread -> delegate_to_claude.* -> Claude Code CLI.",
   "- Do not use the default Codex subagent flow, a host-provided worker shortcut, direct claude execution, or direct main-thread delegate_to_claude.* execution.",
   "- Use the staged flow: plan task graph, dispatch bounded tasks, execute with scoped worker context, review spec compliance, review quality, then verify the workflow.",
+  "- Implementer workflows require spec review, quality review, and final-verifier acceptance.",
   "- Child spawn metadata must be model: gpt-5.3-codex, reasoning_effort: medium, fork_context: false.",
   "- The child must set CODEX_CLAUDE_CHILD_THREAD=1 and call delegate_to_claude.* with -TaskFile, -WorkflowId, -TaskId, -Role, and -SessionKey.",
+  "- Use validate_delegate_task.* to preflight generated TaskFiles when review metadata or -Tests are involved.",
   "- Legacy inline -Task and -Mode delegate arguments are forbidden.",
 ].join("\n");
 

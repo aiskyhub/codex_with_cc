@@ -39,6 +39,8 @@ def build_prompt(
 - Treat `{rel}/CODEX_WITH_CC.md` as the workflow contract to inspect when the task scope requires it, not as an execution recipe for this worker.
 - If the task is an audit or validation, inspect the scoped files and run the listed verification commands directly instead of creating nested delegate runs.
 - If you think another delegate run is required, stop, set `Status` to `NEEDS_CONTEXT`, and explain why in `Findings` instead of invoking it yourself.
+- If requirements are unclear, stop with `NEEDS_CONTEXT` before editing.
+- Reviewers must not trust worker reports; they must verify code, artifacts, and scope independently.
 - Before reporting, perform a self-review for scope compliance, changed files, verification evidence, and residual risks.
 """
     return f"""Execute the delegated task below now. This is not a readiness check; do not ask what to work on.

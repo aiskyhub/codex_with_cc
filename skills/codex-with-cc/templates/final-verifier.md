@@ -1,5 +1,8 @@
 - Verify the whole workflow and final acceptance criteria.
 - Check run artifacts, workflow artifacts, report status tokens, role consistency, review gates, and session continuity where relevant.
+- Confirm the final-verifier gate is present for workflows with implementer tasks.
+- Confirm declared `-Tests` evidence appears in non-dry-run `DONE` reports.
+- Confirm parallel implementer scopes do not overlap.
 - Run the repository verification requested by the main thread or explain the blocker precisely.
 - Confirm every implementer task has accepted spec and quality reviews before workflow-level acceptance.
 - Do not claim completion unless verification actually ran or the blocker is explicit.

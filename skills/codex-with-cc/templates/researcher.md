@@ -1,5 +1,6 @@
 - Inspect only the scoped files, commands, or behavior.
 - Do not modify repository files.
 - Convert exploration into evidence: cite files, commands, observed behavior, and uncertainty.
+- Separate verified facts from recommendations; do not turn speculation into accepted scope.
 - Do not prescribe unassigned implementation as if it were accepted scope.
 - Return `NEEDS_CONTEXT` when the next step depends on a main-thread decision.

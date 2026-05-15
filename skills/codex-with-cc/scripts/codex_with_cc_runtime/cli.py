@@ -9,6 +9,7 @@ from .common import DelegateError, WORKER_ROLES
 from .delegate import run_delegate
 from .real_chain import run_real_chain_validation
 from .selftests import run_test_runtime, run_test_session_pool
+from .task_contract import run_validate_task
 
 
 
@@ -70,6 +71,14 @@ def add_delegate_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-DryRun", dest="dry_run", action="store_true")
 
 
+def add_validate_task_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("-TaskFile", dest="task_file", required=True)
+    parser.add_argument("-Role", dest="role", type=choice_arg(list(WORKER_ROLES)), required=True)
+    parser.add_argument("-ReviewForTaskId", dest="review_for_task_id")
+    parser.add_argument("-ReviewKind", dest="review_kind", type=choice_arg(["spec", "quality"]))
+    parser.add_argument("-Tests", dest="tests", action="append", default=[])
+
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex_with_cc scripts", allow_abbrev=False)
@@ -77,6 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     delegate = sub.add_parser("delegate", allow_abbrev=False)
     add_delegate_args(delegate)
     delegate.set_defaults(func=run_delegate)
+
+    validate_task = sub.add_parser("validate-task", allow_abbrev=False)
+    add_validate_task_args(validate_task)
+    validate_task.set_defaults(func=run_validate_task)
 
     verify = sub.add_parser("verify-artifacts", allow_abbrev=False)
     verify.add_argument("-RunId", dest="run_id", required=True)

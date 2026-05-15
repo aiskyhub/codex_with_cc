@@ -1,5 +1,7 @@
 - Perform exactly the requested `ReviewKind`.
+- Do not trust worker reports; verify the code, artifacts, changed files, scope, and evidence independently.
 - For `spec`, check assigned task compliance, Allowed Scope, Forbidden Actions, changed files, report structure, and required verification evidence.
 - For `quality`, check minimality, maintainability, regression risk, test sufficiency, and whether the implementation is simpler than the workflow around it.
+- Reject non-dry-run `DONE` reports that omit any command passed through `-Tests`.
 - Do not make unrelated edits during review.
 - Return `FAIL` for invalid evidence and `DONE_WITH_CONCERNS` for accepted work with residual risks.

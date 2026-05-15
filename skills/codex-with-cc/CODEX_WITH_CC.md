@@ -15,7 +15,9 @@ Read this file before using the workflow in this repository. Treat `contract.jso
 7. Legacy inline `-Task`, legacy `-Mode`, missing workflow metadata, and implicit session-key fallback are not supported.
 8. `delegate_to_claude.*` must not pass `--effort`; Claude Code uses its configured default effort.
 9. Workers must follow the TaskFile contract: Goal, Allowed Scope, Forbidden Actions, Acceptance Criteria, Verification, and Report Requirements.
-10. Workers must finish with the exact report headings and concrete verification evidence.
+10. Task files with empty sections, obvious placeholders, or incomplete Report Requirements are invalid; use `validate_delegate_task.*` before dispatch when preparing non-trivial work.
+11. Workers must finish with the exact report headings and concrete verification evidence.
+12. Implementer workflows require accepted `spec` and `quality` reviewer runs plus an accepted `final-verifier` run before workflow acceptance.
 
 ## Trigger Rule
 Any user mention of child-agent, subagent, sub-agent, child-thread, subthread, delegation, worker-execution, or Chinese equivalents such as 子代理、子线程、多代理、委派、派工、执行层 is a workflow trigger. When triggered, the main Codex thread must use this custom delegation workflow and must not satisfy the request with the default Codex subagent flow, a host-provided agent shortcut, direct `claude` execution, or direct main-thread execution of `delegate_to_claude.*`.
@@ -40,7 +42,8 @@ Use this as a controlled delivery pipeline, borrowing the core discipline from S
 3. Dispatch gate: create a fresh child thread per task; do not let workers inherit noisy main-thread context.
 4. Implementer gate: implementation workers must use test-first or the smallest equivalent verification-first evidence when the repository has a practical test surface.
 5. Review in two passes. First perform spec compliance review; then perform quality review for minimality, maintainability, regression risk, and test sufficiency.
-6. Finish with evidence: run artifact verification, workflow verification, session continuity checks when relevant, and repository regression tests.
+6. Final-verifier gate: use a final verifier to confirm the aggregate workflow, residual risks, declared verification evidence, and accepted review gates.
+7. Finish with evidence: run artifact verification, workflow verification, session continuity checks when relevant, and repository regression tests.
 
 If any stage lacks evidence, the main thread must request rework or report the blocker instead of smoothing over the gap.
 
@@ -54,7 +57,23 @@ Every `-TaskFile` must contain these sections:
 - `Verification`: exact commands to run, or the smallest meaningful verification expected.
 - `Report Requirements`: the required report headings and status rules.
 
-The runtime rejects task files that do not contain these sections. This makes worker context explicit and prevents old one-line prompts from acting as hidden orchestration.
+The runtime rejects task files that do not contain these sections, leave required sections empty, retain obvious placeholders, or omit required report headings from `Report Requirements`. This makes worker context explicit and prevents old one-line prompts from acting as hidden orchestration.
+
+Pre-dispatch validation:
+
+```powershell
+pwsh -NoProfile -File <installed-workflow-root>\windows_scripts\validate_delegate_task.ps1 `
+  -TaskFile .\.codex\codex_with_cc\tasks\<task-file>.md `
+  -Role implementer `
+  -Tests "pytest -q"
+```
+
+```bash
+"<installed-workflow-root>/macos_scripts/validate_delegate_task.sh" \
+  -TaskFile ./.codex/codex_with_cc/tasks/<task-file>.md \
+  -Role implementer \
+  -Tests "pytest -q"
+```
 
 ## Platform Hook Gate
 The Codex plugin declares `./hooks/hooks.json` as a semi-hard platform gate. When hooks are enabled:
@@ -132,7 +151,7 @@ Delegation artifacts are written under `.codex/codex_with_cc/claude-delegate` by
 - `trace_<RunId>.log`
 - `session-pools/<SessionKey>.json`
 
-Use `verify_delegate_run.*` or `verify_delegate_artifacts.*` for each run, `verify_delegate_workflow.*` for the workflow aggregate, and `verify_delegate_chain.*` for multi-run session continuity checks. The shared implementation lives under `scripts/*.py`; platform wrappers stay thin.
+Use `verify_delegate_run.*` or `verify_delegate_artifacts.*` for each run, `verify_delegate_workflow.*` for the workflow aggregate, and `verify_delegate_chain.*` for multi-run session continuity checks. `verify_delegate_workflow.*` enforces review gates, the final-verifier gate, declared `-Tests` evidence for non-dry-run `DONE` reports, and non-overlapping parallel implementer scopes. The shared implementation lives under `scripts/*.py`; platform wrappers stay thin.
 
 `<installed-workflow-root>` means the installed `skills/codex-with-cc` directory, for example `<codex-home>/plugins/cache/aiskyhub/codex-with-cc/<version-or-hash>/skills/codex-with-cc`. Do not use the package root `<version-or-hash>` directory.
 

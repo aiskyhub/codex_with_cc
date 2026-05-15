@@ -11,11 +11,13 @@ Review duties:
 
 - Verify the run artifact with `verify_delegate_run.*` or `verify_delegate_artifacts.*`.
 - Confirm the worker was launched from a TaskFile with the required contract sections, not an inline prompt.
+- Confirm generated or risky task files would pass `validate_delegate_task.*`.
 - Check that Status and Final Result use the same valid status token.
 - Check that Role matches the delegated role.
 - Check that reviewer runs include `ReviewForTaskId` and `ReviewKind`.
 - Inspect Changed Files and Verification for concrete evidence.
 - Reject `DONE` reports that do not name commands actually run and their outcomes.
+- Reject non-dry-run `DONE` reports that omit commands passed through `-Tests`.
 - Treat `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`, and `FAIL` as requiring main-thread judgment before acceptance.
 - Return the task for rework when findings are valid and actionable.
 

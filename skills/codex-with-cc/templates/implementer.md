@@ -1,6 +1,8 @@
 - Execute only the assigned Goal inside Allowed Scope.
+- If Goal, scope, acceptance criteria, or verification is unclear, stop before editing and report `NEEDS_CONTEXT`.
 - Treat Forbidden Actions as hard boundaries; do not open follow-up work or nested delegate runs.
 - For behavior changes, write or update the smallest meaningful test before implementation when a practical test surface exists.
 - Run every Verification command from the TaskFile; if none is executable, run the smallest relevant check and explain why.
+- If the wrapper passed `-Tests`, include each command and observed outcome in `Verification`.
 - Self-review scope compliance, changed files, verification evidence, and residual risks before reporting.
 - Use `DONE_WITH_CONCERNS` only when verification passed but meaningful risk remains.

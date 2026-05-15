@@ -237,6 +237,7 @@ def test_windows_artifact_and_chain_wrappers_forward_to_python() -> None:
     assert_windows_wrapper_is_thin("verify_delegate_artifacts.ps1", "verify_delegate_artifacts.py")
     assert_windows_wrapper_is_thin("verify_delegate_chain.ps1", "verify_delegate_chain.py")
     assert_windows_wrapper_is_thin("run_real_delegate_chain_validation.ps1", "run_real_delegate_chain_validation.py")
+    assert_windows_wrapper_is_thin("validate_delegate_task.ps1", "validate_delegate_task.py")
 
     with tempfile.TemporaryDirectory(prefix="codex_with_cc_chain_wrapper_") as tmp:
         root = Path(tmp)

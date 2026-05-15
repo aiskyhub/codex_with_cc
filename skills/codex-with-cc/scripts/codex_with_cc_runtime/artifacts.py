@@ -212,9 +212,13 @@ def run_verify_workflow(ns: argparse.Namespace) -> int:
         raise DelegateError(f"Unexpected workflow invocation contract. Expected '{INVOCATION_CONTRACT}'.")
     if workflow.get("workflowId") != ns.workflow_id:
         raise DelegateError("Workflow artifact workflowId mismatch.")
+    verified_runs: dict[str, dict[str, Any]] = {}
     for run_id in (workflow.get("runs") or {}).keys():
-        verify_artifacts(str(run_id), str(root))
+        verified_runs[str(run_id)] = verify_artifacts(str(run_id), str(root))
     enforce_workflow_review_gates(workflow)
+    enforce_workflow_final_verifier_gate(workflow)
+    enforce_declared_tests_are_reported(workflow, verified_runs)
+    enforce_parallel_implementer_scope(workflow, verified_runs)
     print(f"Workflow verification passed for WorkflowId: {ns.workflow_id}")
     return 0
 
@@ -245,6 +249,88 @@ def enforce_workflow_review_gates(workflow: dict[str, Any]) -> None:
             problems.append(f"implementer task {task_id} has non-accepted {', '.join(rejected)} review")
     if problems:
         raise DelegateError("Workflow review gates failed: " + "; ".join(problems))
+
+
+def enforce_workflow_final_verifier_gate(workflow: dict[str, Any]) -> None:
+    tasks = workflow.get("tasks") if isinstance(workflow.get("tasks"), dict) else {}
+    if not any(isinstance(task, dict) and task.get("role") == "implementer" for task in tasks.values()):
+        return
+    accepted = [
+        task_id
+        for task_id, task in tasks.items()
+        if isinstance(task, dict)
+        and task.get("role") == "final-verifier"
+        and task.get("status") == "completed"
+        and task.get("lastReportStatus") == "DONE"
+        and task.get("lastReportFinalResult") == "DONE"
+        and task.get("reviewDecision") == "accepted"
+    ]
+    if not accepted:
+        raise DelegateError("Workflow final-verifier gate failed: implementer workflows require an accepted final-verifier run.")
+
+
+def enforce_declared_tests_are_reported(workflow: dict[str, Any], verified_runs: dict[str, dict[str, Any]]) -> None:
+    problems: list[str] = []
+    for run_id, run in (workflow.get("runs") or {}).items():
+        record = verified_runs.get(str(run_id))
+        if not record:
+            continue
+        config = record["config"]
+        status = record["status"]
+        if any(boolish(attempt.get("dryRun")) for attempt in status.get("attempts") or []):
+            continue
+        tests = [str(item).strip() for item in config.get("tests") or [] if str(item).strip()]
+        if not tests:
+            continue
+        output_path = Path(str(config.get("outputPath")))
+        report_text = output_path.read_text(encoding="utf-8")
+        verification_text = report_section(report_text, "Verification")
+        if parse_report_status(report_text) != "DONE":
+            continue
+        missing = [item for item in tests if item not in verification_text]
+        if missing:
+            task_id = config.get("taskId") or (run or {}).get("taskId") or run_id
+            problems.append(f"task {task_id} missing declared verification evidence: {'; '.join(missing)}")
+    if problems:
+        raise DelegateError("Workflow declared verification failed: " + "; ".join(problems))
+
+
+def normalize_scope_item(value: str) -> str:
+    normalized = value.strip().replace("\\", "/").strip("/")
+    if len(normalized) >= 2 and normalized[1] == ":":
+        normalized = normalized[0].lower() + normalized[1:]
+    return normalized.lower()
+
+
+def scopes_overlap(left: list[str], right: list[str]) -> bool:
+    left_items = [normalize_scope_item(item) for item in left if normalize_scope_item(item)]
+    right_items = [normalize_scope_item(item) for item in right if normalize_scope_item(item)]
+    for left_item in left_items:
+        for right_item in right_items:
+            if left_item == right_item or left_item.startswith(right_item + "/") or right_item.startswith(left_item + "/"):
+                return True
+    return False
+
+
+def enforce_parallel_implementer_scope(workflow: dict[str, Any], verified_runs: dict[str, dict[str, Any]]) -> None:
+    parallel: list[tuple[str, str, list[str]]] = []
+    problems: list[str] = []
+    for run_id, record in verified_runs.items():
+        config = record["config"]
+        if config.get("role") != "implementer" or not boolish(config.get("allowParallel")):
+            continue
+        scope = [str(item) for item in config.get("scope") or [] if str(item).strip()]
+        task_id = str(config.get("taskId") or run_id)
+        if not scope:
+            problems.append(f"parallel implementer task {task_id} is missing scope")
+            continue
+        parallel.append((task_id, run_id, scope))
+    for index, (left_task, _left_run, left_scope) in enumerate(parallel):
+        for right_task, _right_run, right_scope in parallel[index + 1 :]:
+            if scopes_overlap(left_scope, right_scope):
+                problems.append(f"overlapping parallel implementer scope between {left_task} and {right_task}")
+    if problems:
+        raise DelegateError("Workflow parallel scope gate failed: " + "; ".join(problems))
 
 
 
