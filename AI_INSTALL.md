@@ -263,7 +263,7 @@ CODEX_CLAUDE_CHILD_THREAD=1 "<installed-workflow-root>/macos_scripts/delegate_to
   -DryRun
 ```
 
-dry-run 成功后，应能在当前项目看到 `.codex/codex_with_cc/claude-delegate` 下的 `config_<RunId>.json`、`status_<RunId>.json`、`prompt_<RunId>.md`、`claude_<RunId>.md` 和 `workflow_install-check.json`。随后用输出里的 `RunId` 做产物验证。
+dry-run 成功后，默认应能在当前项目看到 `.codex/codex_with_cc/claude-delegate` 下的 `config_<RunId>.json`、`status_<RunId>.json`、`prompt_<RunId>.md`、`claude_<RunId>.md` 和 `workflow_install-check.json`。如果项目内默认目录不可写，运行时会打印 `Artifact Root:` 并自动退到 `$CODEX_HOME/codex_with_cc/claude-delegate/<project-key>`。随后用输出里的 `RunId` 做产物验证。
 
 ## 失败处理
 
@@ -364,6 +364,8 @@ pwsh -NoProfile -File "<installed-workflow-root>\windows_scripts\validate_delega
 ```text
 .codex/codex_with_cc/claude-delegate
 ```
+
+如果这个项目内默认目录不可写，运行时会自动退到用户级 `$CODEX_HOME/codex_with_cc/claude-delegate/<project-key>`，并在输出里打印实际 `Artifact Root:`。显式传入 `-ArtifactRoot` 时不会自动改路径；该目录不可写会直接失败。
 
 常见文件包括：
 

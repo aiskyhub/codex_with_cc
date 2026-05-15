@@ -17,7 +17,7 @@ from .claude_cli import new_claude_cli_args, retry_decision, update_stream_captu
 from .common import ARTIFACT_SCHEMA_VERSION, CHILD_MARKER_NAME, CHILD_MARKER_VALUE, INVOCATION_CONTRACT, DelegateError, now_iso
 from .io_utils import read_text, test_path_writable, write_json, write_text
 from .locks import FileLock, acquire_file_lock
-from .paths import repo_root, workflow_relative_path, workflow_root
+from .paths import project_artifact_root, repo_root, user_artifact_root, workflow_relative_path, workflow_root
 from .prompts import build_prompt
 from .reports import build_report_repair_prompt, get_output_resolution, path_has_required_report_headings
 from .sessions import SessionLease, acquire_session_lease, effective_session_key, normalize_delegate_list, release_session_lease, reset_session_lease_for_fresh_session, safe_session_key, task_fingerprint
@@ -88,6 +88,7 @@ Risks Or Follow-ups
 @dataclasses.dataclass(frozen=True)
 class DelegateArtifactPaths:
     artifact_root: Path
+    artifact_root_fallback_reason: str | None
     output_path: Path
     status_path: Path
     config_path: Path
@@ -99,14 +100,57 @@ class DelegateArtifactPaths:
     run_id: str
 
 
+def unusable_artifact_root_error(artifact_root: Path, exc: Exception) -> DelegateError:
+    return DelegateError(
+        "Artifact root is not writable: "
+        f"{artifact_root}. Fix directory permissions, remove blocking files, or pass -ArtifactRoot <writable-directory>. "
+        "If the Codex child thread is sandbox-blocked, use the trusted local terminal fallback. "
+        "Do not continue the delegated task in the main thread without delegate artifacts. "
+        f"Cause: {exc}"
+    )
+
+
+def unusable_delegate_path_error(path: Path, artifact_root: Path, exc: Exception) -> DelegateError:
+    with contextlib.suppress(Exception):
+        if path.resolve().parent == artifact_root.resolve():
+            return unusable_artifact_root_error(artifact_root, exc)
+    return DelegateError(
+        "Delegate output path is not writable: "
+        f"{path}. Fix directory permissions or pass -OutputPath <writable-file>. "
+        "Do not continue the delegated task in the main thread without delegate artifacts. "
+        f"Cause: {exc}"
+    )
+
+
+def ensure_artifact_root_writable(artifact_root: Path) -> None:
+    try:
+        artifact_root.mkdir(parents=True, exist_ok=True)
+        test_path_writable(artifact_root / ".root_write_probe")
+    except (OSError, DelegateError) as exc:
+        raise unusable_artifact_root_error(artifact_root, exc) from exc
+
+
 def build_artifact_paths(ns: argparse.Namespace, root: Path, workflow_id: str) -> DelegateArtifactPaths:
-    artifact_root = Path(ns.artifact_root).resolve() if ns.artifact_root else (root / ".codex" / "codex_with_cc" / "claude-delegate").resolve()
-    artifact_root.mkdir(parents=True, exist_ok=True)
+    artifact_root_fallback_reason = None
+    if ns.artifact_root:
+        artifact_root = Path(ns.artifact_root).resolve()
+        ensure_artifact_root_writable(artifact_root)
+    else:
+        artifact_root = project_artifact_root(root)
+        try:
+            ensure_artifact_root_writable(artifact_root)
+        except DelegateError as exc:
+            artifact_root_fallback_reason = str(exc)
+            fallback_root = user_artifact_root(root)
+            ensure_artifact_root_writable(fallback_root)
+            print(f"WARNING: Default artifact root is not writable; using user artifact root: {fallback_root}", file=sys.stderr)
+            artifact_root = fallback_root
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
     run_id = f"{timestamp}_{uuid.uuid4().hex[:8]}"
     output_path = Path(ns.output_path).resolve() if ns.output_path else (artifact_root / f"claude_{run_id}.md").resolve()
     return DelegateArtifactPaths(
         artifact_root=artifact_root,
+        artifact_root_fallback_reason=artifact_root_fallback_reason,
         output_path=output_path,
         status_path=artifact_root / f"status_{run_id}.json",
         config_path=artifact_root / f"config_{run_id}.json",
@@ -254,7 +298,10 @@ def run_delegate(ns: argparse.Namespace) -> int:
     fingerprint = task_fingerprint(task_text, scope, tests, mode)
 
     for path in (output_path, status_path, config_path, raw_stream_path, trace_path):
-        test_path_writable(path)
+        try:
+            test_path_writable(path)
+        except DelegateError as exc:
+            raise unusable_delegate_path_error(path, artifact_root, exc) from exc
 
     config: dict[str, Any] = {
         "artifactSchema": ARTIFACT_SCHEMA_VERSION,
@@ -268,6 +315,8 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "repoRoot": str(root),
         "workflowRoot": str(workflow_root()),
         "workflowRelativePath": rel,
+        "artifactRoot": str(artifact_root),
+        "artifactRootFallbackReason": paths.artifact_root_fallback_reason,
         "mode": mode,
         "scope": scope,
         "tests": tests,
@@ -308,6 +357,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "role": role,
         "status": "starting",
         "pid": os.getpid(),
+        "artifactRoot": str(artifact_root),
         "outputPath": str(output_path),
         "promptPath": str(prompt_path),
         "rawStreamPath": str(raw_stream_path),
@@ -401,6 +451,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
         print(f"Session Name: {effective_name}")
         print(f"Session Mode: {ns.session_mode}")
         print(f"Session Key: {key}")
+        print(f"Artifact Root: {artifact_root}")
         print(f"Claude Session Id: {lease.session_id}")
         print(f"Claude Session Argument: {'--resume' if lease.resume else '--session-id'} {lease.session_id}")
         print(f"Prompt: {prompt_path}")

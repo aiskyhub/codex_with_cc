@@ -8,14 +8,29 @@ from typing import Any, Iterable
 
 from .common import ARTIFACT_SCHEMA_VERSION, CHILD_MARKER_NAME, INVOCATION_CONTRACT, REPORT_STATUS_VALUES, WORKER_ROLES, DelegateError, boolish, same_path
 from .io_utils import load_json
-from .paths import repo_root
+from .paths import project_artifact_root, user_artifact_root
 from .reports import parse_report_final_result, parse_report_role, parse_report_status, path_has_required_report_headings, report_section
 from .workflow import REQUIRED_IMPLEMENTER_REVIEWS, workflow_path
 
 
 
+def resolve_artifact_root(artifact_root_value: str | None, run_id: str | None = None, workflow_id: str | None = None) -> Path:
+    if artifact_root_value:
+        return Path(artifact_root_value).resolve()
+    candidates = [project_artifact_root(), user_artifact_root()]
+    if run_id:
+        for root in candidates:
+            if (root / f"config_{run_id}.json").exists():
+                return root
+    if workflow_id:
+        for root in candidates:
+            if workflow_path(root, workflow_id).exists():
+                return root
+    return candidates[0]
+
+
 def verify_artifacts(run_id: str, artifact_root_value: str | None) -> dict[str, Any]:
-    root = Path(artifact_root_value).resolve() if artifact_root_value else (repo_root() / ".codex" / "codex_with_cc" / "claude-delegate").resolve()
+    root = resolve_artifact_root(artifact_root_value, run_id=run_id)
     config_path = root / f"config_{run_id}.json"
     status_path = root / f"status_{run_id}.json"
     for label, path in (("config", config_path), ("status", status_path)):
@@ -201,7 +216,7 @@ def run_verify_artifacts(ns: argparse.Namespace) -> int:
 
 
 def run_verify_workflow(ns: argparse.Namespace) -> int:
-    root = Path(ns.artifact_root).resolve() if ns.artifact_root else (repo_root() / ".codex" / "codex_with_cc" / "claude-delegate").resolve()
+    root = resolve_artifact_root(ns.artifact_root, workflow_id=ns.workflow_id)
     path = workflow_path(root, ns.workflow_id)
     if not path.exists():
         raise DelegateError(f"Missing workflow artifact: {path}")

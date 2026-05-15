@@ -140,7 +140,7 @@ Verification must list commands actually run and their outcomes. A `DONE` report
 The report is evidence, not a success claim by itself. Reviewers and final verifiers should treat missing commands, vague outcomes, role mismatch, status mismatch, or scope drift as acceptance blockers.
 
 ## Artifacts
-Delegation artifacts are written under `.codex/codex_with_cc/claude-delegate` by default:
+Delegation artifacts are written under `.codex/codex_with_cc/claude-delegate` by default. If that project-local default is not writable, the runtime falls back to a user-level path under `$CODEX_HOME/codex_with_cc/claude-delegate/<project-key>`; explicit `-ArtifactRoot` values are still treated as authoritative and fail fast when unusable.
 
 - `workflow_<WorkflowId>.json`
 - `claude_<RunId>.md`

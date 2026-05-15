@@ -171,6 +171,30 @@ def run_delegate(
     )
 
 
+def run_delegate_with_default_artifact_root(task_file: Path, cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(DELEGATE),
+            "-TaskFile",
+            str(task_file),
+            "-WorkflowId",
+            "wf-default-artifact-fallback",
+            "-TaskId",
+            "task-default-artifact-fallback",
+            "-Role",
+            "researcher",
+            "-SessionKey",
+            "default-artifact-fallback",
+            "-DryRun",
+        ],
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+
+
 def verify_artifacts(run_id: str, artifact_root: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(VERIFY_ARTIFACTS), "-RunId", run_id, "-ArtifactRoot", str(artifact_root)],
@@ -212,6 +236,65 @@ def test_dry_run_writes_complete_verifiable_artifacts() -> None:
         verified = verify_artifacts(run_id, artifact_root)
 
         assert verified.returncode == 0, verified.stdout + verified.stderr
+
+
+def test_default_artifact_root_falls_back_to_codex_home_when_project_path_is_unusable() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_default_artifact_fallback_") as tmp:
+        root = Path(tmp)
+        project_root = root / "project"
+        codex_home = root / "codex-home"
+        blocked_artifact_root = project_root / ".codex" / "codex_with_cc" / "claude-delegate"
+        task_root = project_root / ".codex" / "codex_with_cc" / "tasks"
+        task_root.mkdir(parents=True)
+        blocked_artifact_root.parent.mkdir(parents=True, exist_ok=True)
+        blocked_artifact_root.write_text("not a directory", encoding="utf-8")
+        task_file = write_task(task_root, "default-artifact-fallback", "default artifact fallback contract")
+
+        result = run_delegate_with_default_artifact_root(
+            task_file,
+            project_root,
+            {
+                **os.environ,
+                "CODEX_HOME": str(codex_home),
+                "CODEX_CLAUDE_CHILD_THREAD": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+            },
+        )
+
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, output
+        assert "Default artifact root is not writable" in output
+        artifact_root_line = next(line for line in result.stdout.splitlines() if line.startswith("Artifact Root:"))
+        artifact_root = Path(artifact_root_line.split(":", 1)[1].strip())
+        assert codex_home in artifact_root.parents
+        assert artifact_root != blocked_artifact_root
+        run_id = run_id_from_output(result.stdout)
+        config = json.loads((artifact_root / f"config_{run_id}.json").read_text(encoding="utf-8"))
+        assert config["artifactRoot"] == str(artifact_root)
+        assert config["artifactRootFallbackReason"]
+        verified = subprocess.run(
+            [sys.executable, str(VERIFY_ARTIFACTS), "-RunId", run_id],
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            env={**os.environ, "CODEX_HOME": str(codex_home), "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+        assert verified.returncode == 0, verified.stdout + verified.stderr
+
+
+def test_explicit_unusable_artifact_root_fails_with_delegation_remediation() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_unusable_artifact_root_") as tmp:
+        artifact_root = Path(tmp) / "artifacts"
+        artifact_root.write_text("not a directory", encoding="utf-8")
+
+        result = run_delegate("unusable artifact root contract", ["-DryRun"], artifact_root)
+
+        output = result.stdout + result.stderr
+        assert result.returncode != 0
+        assert "Artifact root is not writable" in output
+        assert "-ArtifactRoot" in output
+        assert "trusted local terminal fallback" in output
+        assert "Do not continue the delegated task in the main thread without delegate artifacts." in output
 
 
 def test_artifact_verification_rejects_status_final_result_mismatch() -> None:
