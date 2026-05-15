@@ -24,7 +24,7 @@ def test_plugin_manifest_and_docs_contract() -> None:
     assert (repo / "hooks" / "hooks.json").exists()
 
     codex_interface = codex_plugin["interface"]
-    assert codex_interface["displayName"] == "Codex with CC"
+    assert codex_interface["displayName"] == "Codex With CC"
     assert "Codex" in codex_interface["shortDescription"]
     assert "Claude Code" in codex_interface["shortDescription"]
     assert "aiskyhub" in codex_interface["longDescription"]

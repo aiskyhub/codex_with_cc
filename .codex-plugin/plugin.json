@@ -17,7 +17,7 @@
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",
   "interface": {
-    "displayName": "Codex with CC",
+    "displayName": "Codex With CC",
     "shortDescription": "Codex plugin for the Claude Code delegation workflow.",
     "longDescription": "Routes Codex main thread planning into staged Codex child-agent execution that is handed off to Claude Code CLI with workflow/task/run artifacts, and is distributed marketplace-first through aiskyhub/aiskyhub for Codex installations.",
     "developerName": "xdd666t",
