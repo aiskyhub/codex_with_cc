@@ -40,6 +40,16 @@ def make_fake_claude_bin(root: Path, stdin_capture: Path) -> Path:
         "exit /b 0\n",
         encoding="utf-8",
     )
+    posix_claude = fake_bin / "claude"
+    posix_claude.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        f"open({str(stdin_capture)!r}, 'w', encoding='utf-8').write(sys.stdin.read())\n"
+        f"print({assistant!r})\n"
+        f"print({result!r})\n",
+        encoding="utf-8",
+    )
+    posix_claude.chmod(0o755)
     return fake_bin
 
 

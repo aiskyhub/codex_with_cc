@@ -757,6 +757,7 @@ Risks Or Follow-ups
                 str(status.get("status") or "unknown"),
                 safe_task_id(ns.review_for_task_id) if ns.review_for_task_id else None,
                 ns.review_kind,
+                runner_type="claude_code",
             )
         release_session_lease(session_state_path, session_state_lock_path, key, lease, run_id, fingerprint)
         if delegate_lock is not None:

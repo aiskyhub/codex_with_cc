@@ -7,6 +7,7 @@ from typing import Callable
 from .artifacts import run_verify_artifacts, run_verify_chain, run_verify_workflow
 from .common import DelegateError, WORKER_ROLES
 from .delegate import run_delegate
+from .openai_compatible_report import run_openai_compatible_report_delegate
 from .real_chain import run_real_chain_validation
 from .selftests import run_test_runtime, run_test_session_pool
 from .task_contract import run_validate_task
@@ -86,6 +87,10 @@ def build_parser() -> argparse.ArgumentParser:
     delegate = sub.add_parser("delegate", allow_abbrev=False)
     add_delegate_args(delegate)
     delegate.set_defaults(func=run_delegate)
+
+    report = sub.add_parser("openai-compatible-report", allow_abbrev=False)
+    add_delegate_args(report)
+    report.set_defaults(func=run_openai_compatible_report_delegate, model="deepseek-v4-flash")
 
     validate_task = sub.add_parser("validate-task", allow_abbrev=False)
     add_validate_task_args(validate_task)

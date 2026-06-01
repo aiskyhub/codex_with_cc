@@ -89,6 +89,11 @@ This fallback is an execution-location fallback only. Preserve the same `CODEX_C
 
 Do not replace this with the default Codex subagent flow, a direct `claude` command, or a modified worker command. Report that the trusted terminal fallback was used and include the command outcome in verification.
 
+## OpenAI-Compatible Report Runner
+`delegate_to_openai_compatible_report.*` is a report-only sibling runner for low-cost workflow judgment, preflight, audit summaries, acceptance reports, and report normalization. It uses the same task-file, workflow metadata, report headings, child-thread marker, and artifact verification contract as the Claude runner, but it must not execute shell tests, modify project files, or perform implementation work.
+
+Configure it with environment variables or a project `.env` file. Environment variables take precedence. Supported names are `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` or `DEEPSEEK_API_BASE_URL`, and `DEEPSEEK_MODEL`; OpenAI-compatible aliases are also accepted. API keys must never be written to artifacts.
+
 ## Roles
 - Codex main thread: clarify intent, approve design, define task files, create child threads, review results, request rework, and decide final acceptance.
 - Codex child thread: provide the visible conversation-tree node and invoke the worker script.
@@ -143,7 +148,7 @@ The report is evidence, not a success claim by itself. Reviewers and final verif
 Delegation artifacts are written under `.codex/codex_with_cc/claude-delegate` by default. If that project-local default is not writable, the runtime falls back to a user-level path under `$CODEX_HOME/codex_with_cc/claude-delegate/<project-key>`; explicit `-ArtifactRoot` values are still treated as authoritative and fail fast when unusable.
 
 - `workflow_<WorkflowId>.json`
-- `claude_<RunId>.md`
+- `claude_<RunId>.md` for Claude Code runs, or `report_<RunId>.md` for report-only OpenAI-compatible runs
 - `status_<RunId>.json`
 - `config_<RunId>.json`
 - `prompt_<RunId>.md`

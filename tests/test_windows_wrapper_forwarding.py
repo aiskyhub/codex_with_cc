@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import pytest
 
 from tests.task_helpers import compliant_task
 
@@ -15,6 +18,8 @@ WIN = WORKFLOW / "windows_scripts"
 
 
 def run_pwsh(script: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    if shutil.which("pwsh") is None:
+        pytest.skip("PowerShell is required for Windows wrapper execution tests")
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
@@ -28,6 +33,8 @@ def run_pwsh(script: Path, *args: str, env: dict[str, str] | None = None) -> sub
 
 
 def run_pwsh_command(command: str) -> subprocess.CompletedProcess[str]:
+    if shutil.which("pwsh") is None:
+        pytest.skip("PowerShell is required for Windows wrapper execution tests")
     return subprocess.run(
         ["pwsh", "-NoProfile", "-Command", command],
         cwd=REPO,

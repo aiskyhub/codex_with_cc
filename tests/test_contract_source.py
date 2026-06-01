@@ -100,6 +100,8 @@ def test_contract_json_is_single_source_for_runtime_constants() -> None:
     assert contract["spawn"]["model"] == "gpt-5.3-codex"
     assert contract["spawn"]["reasoningEffort"] == "medium"
     assert contract["spawn"]["forkContext"] is False
+    assert "delegateEntrypointPatterns" in contract
+    assert contract["delegateEntrypointPattern"] in contract["delegateEntrypointPatterns"]
     assert "-Task" in contract["legacy"]["forbiddenArgs"]
     assert "-Mode" in contract["legacy"]["forbiddenArgs"]
 
@@ -134,6 +136,33 @@ def test_hook_gate_reads_spawn_requirements_from_contract_json() -> None:
 
     reason = denied["hookSpecificOutput"]["permissionDecisionReason"]
     assert "contract-model" in reason
+
+
+def test_hook_gate_uses_delegate_entrypoint_patterns_from_contract_json() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_contract_hook_entrypoints_") as tmp:
+        plugin_root = Path(tmp)
+        workflow_root = plugin_root / "skills" / "codex-with-cc"
+        workflow_root.mkdir(parents=True)
+        (workflow_root / "SKILL.md").write_text("# codex-with-cc\n", encoding="utf-8")
+        (workflow_root / "CODEX_WITH_CC.md").write_text("# Codex with CC\n", encoding="utf-8")
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        contract["delegateEntrypointPattern"] = "delegate_to_claude(?:\\.(?:ps1|sh|cmd|bat))?"
+        contract["delegateEntrypointPatterns"] = ["delegate_to_openai_report_only(?:\\.(?:ps1|sh|cmd|bat))?"]
+        (workflow_root / "contract.json").write_text(json.dumps(contract), encoding="utf-8")
+
+        denied = run_hook(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "pwsh -NoProfile -File windows_scripts/delegate_to_openai_report_only.ps1 -TaskFile t.md -WorkflowId wf -TaskId t -Role researcher -SessionKey k"
+                },
+            },
+            env={"CODEX_PLUGIN_ROOT": str(plugin_root)},
+        )
+
+    reason = denied["hookSpecificOutput"]["permissionDecisionReason"]
+    assert "CODEX_CLAUDE_CHILD_THREAD=1 is required" in reason
 
 
 def test_delegate_rejects_task_files_without_required_sections() -> None:
