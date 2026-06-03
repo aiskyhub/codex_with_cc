@@ -49,7 +49,7 @@ def test_codex_with_cc_skill_contract() -> None:
 
     codex_manifest = json.loads(codex_plugin.read_text(encoding="utf-8"))
     assert codex_manifest["name"] == "codex-with-cc"
-    assert re.fullmatch(r"1\.0\.6(?:\+codex\.[A-Za-z0-9_.-]+)?", codex_manifest["version"])
+    assert re.fullmatch(r"1\.0\.7(?:\+codex\.[A-Za-z0-9_.-]+)?", codex_manifest["version"])
     assert codex_manifest["skills"] == "./skills/"
     assert "aiskyhub" in codex_manifest["interface"]["longDescription"]
     assert any("aiskyhub/aiskyhub" in prompt for prompt in codex_manifest["interface"]["defaultPrompt"])
@@ -158,7 +158,7 @@ def test_workflow_docs_do_not_expose_version_branding() -> None:
         scanned.append(rel)
         haystack = rel.as_posix()
         if path.suffix.lower() in {".md", ".py", ".js", ".json", ".yaml", ".yml", ".ps1", ".sh"}:
-            haystack += "\n" + path.read_text(encoding="utf-8")
+            haystack += "\n" + path.read_text(encoding="utf-8", errors="ignore")
         for token in forbidden:
             assert token not in haystack, f"unexpected version branding token {token!r} in {rel}"
 

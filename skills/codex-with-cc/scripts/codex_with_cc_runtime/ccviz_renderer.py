@@ -254,7 +254,7 @@ def render_audit(workflow: dict[str, Any]) -> None:
     # 1. Check Artifact Schema
     schema = workflow.get("artifactSchema")
     if schema == 3:
-        successes.append("Contract Schema: V3 validated.")
+        successes.append("Contract Schema: Version 3 validated.")
     else:
         warnings.append(f"Contract Schema: Invalid schema version {schema}. Expected 3.")
         audit_passed = False
