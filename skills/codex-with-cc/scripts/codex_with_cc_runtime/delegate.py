@@ -619,6 +619,11 @@ def run_delegate(ns: argparse.Namespace) -> int:
                             fingerprint,
                             str(decision["retryReason"]),
                         )
+                    elif decision["retryWithResumeSession"]:
+                        print("WARNING: Claude transport closed unexpectedly after worker progress. Retrying once by resuming the same Claude session.", file=sys.stderr)
+                        trace_handle.write("[retry] transport closed after worker progress; resuming the same Claude session\n")
+                        trace_handle.flush()
+                        lease = dataclasses.replace(lease, resume=True)
                     elif decision["retryWithReportRepair"]:
                         print("WARNING: Claude completed without the required report headings. Retrying once for structured report repair.", file=sys.stderr)
                         trace_handle.write("[retry] unstructured success; asking the same Claude session to emit the required report headings\n")

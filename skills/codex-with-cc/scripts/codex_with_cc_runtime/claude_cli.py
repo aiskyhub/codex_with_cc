@@ -123,16 +123,21 @@ def retry_decision(
     saw_result_success: bool,
     captured_final_result_heading: bool,
 ) -> dict[str, Any]:
-    joined = "\n".join(non_json_raw_lines(raw_lines))
+    raw_line_list = [str(line).strip() for line in raw_lines if str(line).strip()]
+    joined = "\n".join(non_json_raw_lines(raw_line_list))
+    joined_all = "\n".join(raw_line_list)
     saw_stale = re.search(r"No conversation found.*session ID", joined) is not None
     saw_stream_json = re.search(r"stream-json.*requires.*--verbose", joined) is not None
+    saw_socket_closed = re.search(r"socket connection was closed unexpectedly", joined_all, re.IGNORECASE) is not None
     has_structured_success = saw_result_success and captured_final_result_heading
     decision = {
         "shouldRetry": False,
         "retryReason": "",
         "retryWithFreshSession": False,
+        "retryWithResumeSession": False,
         "sawStaleSessionText": saw_stale,
         "sawStreamJsonVerboseError": saw_stream_json,
+        "sawSocketClosedText": saw_socket_closed,
         "hasStructuredSuccess": has_structured_success,
         "exitCode": exit_code,
         "sawAssistantText": saw_assistant_text,
@@ -144,6 +149,8 @@ def retry_decision(
         decision.update({"shouldRetry": True, "retryReason": "stale_claude_session", "retryWithFreshSession": True})
     elif saw_stream_json and not has_structured_success:
         decision.update({"shouldRetry": True, "retryReason": "stream_json_startup", "retryWithFreshSession": False})
+    elif saw_socket_closed and saw_assistant_text and not has_structured_success:
+        decision.update({"shouldRetry": True, "retryReason": "socket_transport_after_progress", "retryWithResumeSession": True})
     elif exit_code == 0 and saw_result_success and saw_assistant_text and not has_structured_success:
         decision.update(
             {

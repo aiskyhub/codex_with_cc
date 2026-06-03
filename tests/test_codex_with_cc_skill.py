@@ -49,7 +49,7 @@ def test_codex_with_cc_skill_contract() -> None:
 
     codex_manifest = json.loads(codex_plugin.read_text(encoding="utf-8"))
     assert codex_manifest["name"] == "codex-with-cc"
-    assert re.fullmatch(r"1\.0\.7(?:\+codex\.[A-Za-z0-9_.-]+)?", codex_manifest["version"])
+    assert re.fullmatch(r"1\.0\.8(?:\+codex\.[A-Za-z0-9_.-]+)?", codex_manifest["version"])
     assert codex_manifest["skills"] == "./skills/"
     assert "aiskyhub" in codex_manifest["interface"]["longDescription"]
     assert any("aiskyhub/aiskyhub" in prompt for prompt in codex_manifest["interface"]["defaultPrompt"])

@@ -163,6 +163,55 @@ def make_file_report_fake_claude_bin(root: Path) -> Path:
     return fake_bin
 
 
+def make_socket_retry_fake_claude_bin(root: Path) -> Path:
+    fake_bin = root / "fake-socket-retry-claude-bin"
+    fake_bin.mkdir(parents=True, exist_ok=True)
+    script = fake_bin / "fake_socket_retry_claude.py"
+    script.write_text(
+        "\n".join(
+            (
+                "import json",
+                "import os",
+                "import sys",
+                "from pathlib import Path",
+                "",
+                f"report = {REPORT!r}",
+                "state_path = Path(os.environ['FAKE_SOCKET_RETRY_STATE'])",
+                "log_path = Path(os.environ['FAKE_SOCKET_RETRY_LOG'])",
+                "count = int(state_path.read_text(encoding='utf-8')) if state_path.exists() else 0",
+                "count += 1",
+                "state_path.write_text(str(count), encoding='utf-8')",
+                "log_path.write_text(' '.join(sys.argv[1:]), encoding='utf-8')",
+                "sys.stdin.read()",
+                "if count == 1:",
+                "    print(json.dumps({'type': 'assistant', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'Working on the delegated task.'}]}}))",
+                "    print(json.dumps({'type': 'assistant', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'API Error: The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()'}]}}))",
+                "    print(json.dumps({'type': 'result', 'subtype': 'success'}))",
+                "    raise SystemExit(1)",
+                "if '--resume' not in sys.argv[1:]:",
+                "    print('missing --resume on retry', file=sys.stderr)",
+                "    raise SystemExit(2)",
+                "print(json.dumps({'type': 'assistant', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': report}]}}))",
+                "print(json.dumps({'type': 'result', 'subtype': 'success'}))",
+            )
+        ),
+        encoding="utf-8",
+    )
+    if os.name == "nt":
+        (fake_bin / "claude.cmd").write_text(
+            f'@echo off\n"{sys.executable}" "{script}" %*\n',
+            encoding="utf-8",
+        )
+    else:
+        shim = fake_bin / "claude"
+        shim.write_text(
+            f"#!/bin/sh\nexec '{sys.executable}' '{script}' \"$@\"\n",
+            encoding="utf-8",
+        )
+        shim.chmod(shim.stat().st_mode | stat.S_IEXEC)
+    return fake_bin
+
+
 def write_task(root: Path, name: str, text: str) -> Path:
     task_file = root / f"{name}.md"
     task_file.write_text(compliant_task(text), encoding="utf-8")
@@ -432,6 +481,37 @@ def test_structured_output_file_allows_unstructured_final_summary() -> None:
         assert verified.returncode == 0, verified.stdout + verified.stderr
         output = (artifact_root / f"claude_{run_id}.md").read_text(encoding="utf-8")
         assert output == REPORT
+
+
+def test_socket_close_after_progress_retries_with_resume_session() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_socket_retry_") as tmp:
+        root = Path(tmp)
+        artifact_root = root / "artifacts"
+        fake_bin = make_socket_retry_fake_claude_bin(root)
+        state_path = root / "socket-retry-count.txt"
+        log_path = root / "socket-retry-args.txt"
+        result = run_delegate(
+            "socket retry after progress",
+            ["-BypassPermissions", "-MaxRetryCount", "1"],
+            artifact_root,
+            {
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "FAKE_SOCKET_RETRY_STATE": str(state_path),
+                "FAKE_SOCKET_RETRY_LOG": str(log_path),
+            },
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        run_id = run_id_from_output(result.stdout)
+        verified = verify_artifacts(run_id, artifact_root)
+        status = json.loads((artifact_root / f"status_{run_id}.json").read_text(encoding="utf-8"))
+
+        assert verified.returncode == 0, verified.stdout + verified.stderr
+        assert state_path.read_text(encoding="utf-8") == "2"
+        assert "--resume" in log_path.read_text(encoding="utf-8")
+        assert status["status"] == "completed"
+        assert int(status["retryCount"]) == 1
+        assert status["attempts"][0]["retryReason"] == "socket_transport_after_progress"
 
 
 def test_task_fingerprint_uses_full_task_text() -> None:
