@@ -49,7 +49,7 @@ def test_codex_with_cc_skill_contract() -> None:
 
     codex_manifest = json.loads(codex_plugin.read_text(encoding="utf-8"))
     assert codex_manifest["name"] == "codex-with-cc"
-    assert codex_manifest["version"] == "1.0.6"
+    assert re.fullmatch(r"1\.0\.6(?:\+codex\.[A-Za-z0-9_.-]+)?", codex_manifest["version"])
     assert codex_manifest["skills"] == "./skills/"
     assert "aiskyhub" in codex_manifest["interface"]["longDescription"]
     assert any("aiskyhub/aiskyhub" in prompt for prompt in codex_manifest["interface"]["defaultPrompt"])
@@ -161,3 +161,8 @@ def test_workflow_docs_do_not_expose_version_branding() -> None:
             haystack += "\n" + path.read_text(encoding="utf-8")
         for token in forbidden:
             assert token not in haystack, f"unexpected version branding token {token!r} in {rel}"
+
+
+def test_macos_shell_wrappers_use_zsh_shebang() -> None:
+    for path in (skill / "macos_scripts").glob("*.sh"):
+        assert path.read_text(encoding="utf-8").startswith("#!/bin/zsh\n"), path.name

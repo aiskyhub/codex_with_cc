@@ -1,6 +1,6 @@
 {
   "name": "codex-with-cc",
-  "version": "1.0.6",
+  "version": "1.0.6+codex.20260601072831",
   "description": "A Codex plugin for delegating Codex child-agent work to Claude Code CLI with workflow artifacts.",
   "author": {
     "name": "xdd666t"

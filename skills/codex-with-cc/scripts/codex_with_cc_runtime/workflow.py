@@ -102,6 +102,7 @@ def update_workflow_record(
     run_status: str,
     review_for_task_id: str | None = None,
     review_kind: str | None = None,
+    runner_type: str | None = None,
 ) -> Path:
     path = workflow_path(artifact_root, workflow_id)
     if path.exists():
@@ -153,6 +154,7 @@ def update_workflow_record(
         "runId": run_id,
         "taskId": task_id,
         "role": role,
+        "runnerType": runner_type,
         "status": run_status,
         "reportStatus": report_status,
         "reportFinalResult": report_final_result,

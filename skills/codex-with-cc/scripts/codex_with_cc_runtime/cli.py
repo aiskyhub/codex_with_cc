@@ -7,9 +7,12 @@ from typing import Callable
 from .artifacts import run_verify_artifacts, run_verify_chain, run_verify_workflow
 from .common import DelegateError, WORKER_ROLES
 from .delegate import run_delegate
+from .openai_compatible_report import run_openai_compatible_report_delegate
 from .real_chain import run_real_chain_validation
 from .selftests import run_test_runtime, run_test_session_pool
 from .task_contract import run_validate_task
+from .ccviz_parser import list_workflows, get_workflow_details
+from .ccviz_renderer import render_list, render_show, render_audit
 
 
 
@@ -87,6 +90,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_delegate_args(delegate)
     delegate.set_defaults(func=run_delegate)
 
+    report = sub.add_parser("openai-compatible-report", allow_abbrev=False)
+    add_delegate_args(report)
+    report.set_defaults(func=run_openai_compatible_report_delegate, model="deepseek-v4-flash")
+
     validate_task = sub.add_parser("validate-task", allow_abbrev=False)
     add_validate_task_args(validate_task)
     validate_task.set_defaults(func=run_validate_task)
@@ -122,7 +129,50 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("test-runtime").set_defaults(func=run_test_runtime)
     sub.add_parser("test-session-pool").set_defaults(func=run_test_session_pool)
+
+    # ccviz subcommands
+    ccviz = sub.add_parser("ccviz", allow_abbrev=False)
+    ccviz_sub = ccviz.add_subparsers(dest="ccviz_command", required=True)
+    
+    ccviz_list = ccviz_sub.add_parser("list", allow_abbrev=False)
+    ccviz_list.add_argument("-ArtifactRoot", dest="artifact_root")
+    ccviz_list.set_defaults(func=run_ccviz_list)
+    
+    ccviz_show = ccviz_sub.add_parser("show", allow_abbrev=False)
+    ccviz_show.add_argument("workflow_id")
+    ccviz_show.add_argument("-ArtifactRoot", dest="artifact_root")
+    ccviz_show.set_defaults(func=run_ccviz_show)
+    
+    ccviz_audit = ccviz_sub.add_parser("audit", allow_abbrev=False)
+    ccviz_audit.add_argument("workflow_id")
+    ccviz_audit.add_argument("-ArtifactRoot", dest="artifact_root")
+    ccviz_audit.set_defaults(func=run_ccviz_audit)
+
     return parser
+
+
+def run_ccviz_list(ns: argparse.Namespace) -> int:
+    workflows = list_workflows(ns.artifact_root)
+    render_list(workflows)
+    return 0
+
+
+def run_ccviz_show(ns: argparse.Namespace) -> int:
+    wf = get_workflow_details(ns.workflow_id, ns.artifact_root)
+    if not wf:
+        print(f"\033[91mError: Workflow '{ns.workflow_id}' not found.\033[0m", file=sys.stderr)
+        return 1
+    render_show(wf)
+    return 0
+
+
+def run_ccviz_audit(ns: argparse.Namespace) -> int:
+    wf = get_workflow_details(ns.workflow_id, ns.artifact_root)
+    if not wf:
+        print(f"\033[91mError: Workflow '{ns.workflow_id}' not found.\033[0m", file=sys.stderr)
+        return 1
+    render_audit(wf)
+    return 0
 
 
 

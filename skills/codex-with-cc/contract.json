@@ -52,6 +52,10 @@
     "worker"
   ],
   "delegateEntrypointPattern": "delegate_to_claude(?:\\.(?:ps1|sh|cmd|bat))?",
+  "delegateEntrypointPatterns": [
+    "delegate_to_claude(?:\\.(?:ps1|sh|cmd|bat))?",
+    "delegate_to_(?:openai(?:_compatible)?(?:_report(?:_only)?)?)(?:\\.(?:ps1|sh|cmd|bat))?"
+  ],
   "requiredDelegateArgs": [
     "-TaskFile",
     "-WorkflowId",

@@ -1,6 +1,6 @@
 ---
 name: codex-with-cc
-description: Force Codex with Claude Code routing for any child-agent, subagent, sub-agent, child-thread, subthread, delegation, worker-execution, 子代理, 子线程, 多代理, 委派, 派工, or 执行层 task; use this skill whenever Codex must plan, dispatch, review, or execute work through child agents instead of default subagent behavior.
+description: Force Codex with delegated worker routing for any child-agent, subagent, sub-agent, child-thread, subthread, delegation, worker-execution, 子代理, 子线程, 多代理, 委派, 派工, or 执行层 task; use this skill whenever Codex must plan, dispatch, review, or execute work through child agents instead of default subagent behavior.
 ---
 
 # Codex with CC
@@ -9,7 +9,7 @@ description: Force Codex with Claude Code routing for any child-agent, subagent,
 
 Use this skill as the mandatory entry point for every child-agent, subagent, sub-agent, child-thread, subthread, delegation, worker-execution, 子代理, 子线程, 多代理, 委派, 派工, or 执行层 request.
 
-Do not satisfy a triggered request with default Codex subagent behavior, direct Claude Code CLI execution, direct `claude` execution, or direct main-thread execution of `delegate_to_claude.*`.
+Do not satisfy a triggered request with default Codex subagent behavior, direct Claude Code CLI execution, direct `claude` execution, or direct main-thread execution of bundled delegate scripts.
 
 ## Workflow Contract
 
@@ -17,10 +17,14 @@ Read `CODEX_WITH_CC.md` in this skill directory before using the workflow. Treat
 
 This skill is distributed through a plugin-managed installation. When invoking bundled scripts, run them from the target project's current working directory so `.codex/codex_with_cc` tasks and artifacts are written to that project, not to the plugin cache.
 
-The required chain is:
+The required chain is always Codex main thread to Codex child thread to a bundled delegate runner:
 
 ```text
+Implementation or code-capable work:
 Codex main thread -> Codex spawn_agent child thread -> delegate_to_claude.* -> Claude Code CLI
+
+Report-only workflow judgment, preflight, audit, acceptance report, or report normalization:
+Codex main thread -> Codex spawn_agent child thread -> delegate_to_openai_compatible_report.* -> OpenAI-compatible Chat Completions API
 ```
 
 The installed plugin also declares `./hooks/hooks.json` so Codex hosts with hooks enabled can inject this contract at session start, reinforce it on matching user prompts, and deny supported non-compliant tool calls.
@@ -41,15 +45,15 @@ Workers are context consumers, not decision owners. Codex main thread owns archi
 
 The Codex child thread must:
 
-- Set `CODEX_CLAUDE_CHILD_THREAD=1` before invoking `delegate_to_claude.*`.
+- Set `CODEX_CLAUDE_CHILD_THREAD=1` before invoking the selected bundled delegate runner.
 - Pass task instructions through `.codex/codex_with_cc/tasks/<yyyyMMdd>/<HHmmssfff>-<short-id>-<task-name>.md` with `-TaskFile`.
 - Pass `-WorkflowId`, `-TaskId`, `-Role`, and `-SessionKey`.
 - Avoid legacy inline `-Task`, legacy `-Mode`, and implicit session-key fallback.
 - Keep changes inside the delegated scope and pass `-Scope` for any parallel writable work.
-- Run the requested verification.
+- Run the requested verification only for code-capable Claude worker tasks. Report-only OpenAI-compatible tasks must not execute shell tests and should treat `-Tests` as report requirements.
 - Ensure any command passed through `-Tests` appears with an outcome in the worker's `Verification` report.
 
-Task files that omit required sections, leave sections empty, keep obvious placeholders, or omit required report headings are rejected before Claude Code starts. This keeps worker context explicit and removes the old one-line prompt path.
+Task files that omit required sections, leave sections empty, keep obvious placeholders, or omit required report headings are rejected before the worker runner starts. This keeps worker context explicit and removes the old one-line prompt path.
 
 ## Multi-Skill Chain
 
@@ -69,7 +73,7 @@ In the main Codex thread:
 - Prefer serial execution when write scopes overlap or acceptance criteria are still unstable.
 - Use parallel execution only for independent read-only tasks or writable tasks with explicit non-overlapping `-Scope` values.
 - Do not run `claude` directly.
-- Do not run `delegate_to_claude.*` directly except when `CODEX_WITH_CC.md` explicitly allows the trusted local terminal fallback.
+- Do not run bundled delegate scripts directly except when `CODEX_WITH_CC.md` explicitly allows the trusted local terminal fallback.
 - Verify each run with `verify_delegate_run.*` or `verify_delegate_artifacts.*`.
 - Verify the whole workflow with `verify_delegate_workflow.*`; use `verify_delegate_chain.*` when validating primary/parallel session continuity.
 - Reject implementer work until both `spec` and `quality` reviewer runs are accepted.
@@ -79,7 +83,7 @@ In the main Codex thread:
 
 ## Worker Report Contract
 
-Every Claude worker must finish with these exact headings:
+Every worker must finish with these exact headings:
 
 ```text
 Status

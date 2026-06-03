@@ -171,9 +171,11 @@ def test_delegate_dry_run_writes_workflow_artifacts_and_verifies_them() -> None:
         assert config["workflowId"] == "wf-contract"
         assert config["taskId"] == "task-contract"
         assert config["role"] == "researcher"
+        assert config["runnerType"] == "claude_code"
         assert status["workflowId"] == "wf-contract"
         assert status["taskId"] == "task-contract"
         assert status["role"] == "researcher"
+        assert status["runnerType"] == "claude_code"
         assert text_has_required_report_headings(report)
         assert workflow["artifactSchema"] == 3
         assert workflow["workflowId"] == "wf-contract"
@@ -187,6 +189,7 @@ def test_delegate_dry_run_writes_workflow_artifacts_and_verifies_them() -> None:
         assert workflow["runs"][run_id]["reportFinalResult"] == "DONE"
         assert workflow["runs"][run_id]["reportRole"] == "researcher"
         assert workflow["runs"][run_id]["reviewDecision"] == "accepted"
+        assert workflow["runs"][run_id]["runnerType"] == "claude_code"
 
         verify_run = run_python(VERIFY_RUN, "-RunId", run_id, "-ArtifactRoot", str(artifact_root), cwd=REPO, env=env)
         verify_workflow = run_python(VERIFY_WORKFLOW, "-WorkflowId", "wf-contract", "-ArtifactRoot", str(artifact_root), cwd=REPO, env=env)

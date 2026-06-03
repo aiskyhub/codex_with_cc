@@ -19,6 +19,10 @@ const FALLBACK_CONTRACT = {
   ],
   spawnToolNames: ["spawn_agent", "task", "subagent", "agent", "worker"],
   delegateEntrypointPattern: "delegate_to_claude(?:\\.(?:ps1|sh|cmd|bat))?",
+  delegateEntrypointPatterns: [
+    "delegate_to_claude(?:\\.(?:ps1|sh|cmd|bat))?",
+    "delegate_to_(?:openai(?:_compatible)?(?:_report(?:_only)?)?)(?:\\.(?:ps1|sh|cmd|bat))?",
+  ],
 };
 
 const FALLBACK_CONTEXT = [
@@ -54,6 +58,9 @@ function readOptionalText(filePath) {
 }
 
 function mergeContract(contract) {
+  const delegateEntrypointPatterns = Array.isArray(contract.delegateEntrypointPatterns) && contract.delegateEntrypointPatterns.length > 0
+    ? contract.delegateEntrypointPatterns
+    : [contract.delegateEntrypointPattern || FALLBACK_CONTRACT.delegateEntrypointPattern];
   return {
     ...FALLBACK_CONTRACT,
     ...contract,
@@ -62,6 +69,7 @@ function mergeContract(contract) {
     workerRoles: Array.isArray(contract.workerRoles) ? contract.workerRoles : FALLBACK_CONTRACT.workerRoles,
     triggerPatterns: Array.isArray(contract.triggerPatterns) ? contract.triggerPatterns : FALLBACK_CONTRACT.triggerPatterns,
     spawnToolNames: Array.isArray(contract.spawnToolNames) ? contract.spawnToolNames : FALLBACK_CONTRACT.spawnToolNames,
+    delegateEntrypointPatterns,
   };
 }
 
@@ -86,7 +94,7 @@ const CHILD_MARKER_VALUE = CONTRACT.childThread.markerValue;
 const ALLOWED_ROLES = new Set(CONTRACT.workerRoles.map((role) => String(role).toLowerCase()));
 const TRIGGER_PATTERNS = CONTRACT.triggerPatterns.map((pattern) => new RegExp(pattern, "i"));
 const SPAWN_TOOL_NAMES = new Set(CONTRACT.spawnToolNames.map((name) => String(name).toLowerCase()));
-const DELEGATE_ENTRYPOINT_PATTERN = new RegExp(CONTRACT.delegateEntrypointPattern, "i");
+const DELEGATE_ENTRYPOINT_PATTERNS = CONTRACT.delegateEntrypointPatterns.map((pattern) => new RegExp(pattern, "i"));
 
 function bootstrapContext() {
   const root = pluginRoot();
@@ -247,7 +255,7 @@ function hasChildMarker(serialized) {
 }
 
 function hasDelegateEntrypoint(serialized) {
-  return DELEGATE_ENTRYPOINT_PATTERN.test(serialized);
+  return DELEGATE_ENTRYPOINT_PATTERNS.some((pattern) => pattern.test(serialized));
 }
 
 function hasTaskFile(serialized) {
@@ -304,7 +312,7 @@ function hasForbiddenEffort(serialized) {
 }
 
 function hasDirectClaudeCommand(serialized) {
-  return /(?:^|[\s;&|"'`])(?:\.\/|\.\\|[\w:/\\.-]*[/\\])?claude(?:\.cmd|\.exe)?(?=$|[\s;&|"'`])/i.test(serialized);
+  return /(?:^|[\n\r;&|`"'])\s*(?:\.\/|\.\\|[\w:/\\.-]*[/\\])?claude(?:\.cmd|\.exe)?(?:\s+(?:-|--|<|>|2>|&>|;|\||&&|\|\|)|\s*$|$)/i.test(serialized);
 }
 
 function validateWorkflowPayload(payload) {

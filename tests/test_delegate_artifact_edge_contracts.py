@@ -323,7 +323,7 @@ def test_default_artifact_root_falls_back_to_codex_home_when_project_path_is_unu
         assert "Default artifact root is not writable" in output
         artifact_root_line = next(line for line in result.stdout.splitlines() if line.startswith("Artifact Root:"))
         artifact_root = Path(artifact_root_line.split(":", 1)[1].strip())
-        assert codex_home in artifact_root.parents
+        assert codex_home.resolve() in artifact_root.resolve().parents
         assert artifact_root != blocked_artifact_root
         run_id = run_id_from_output(result.stdout)
         config = json.loads((artifact_root / f"config_{run_id}.json").read_text(encoding="utf-8"))

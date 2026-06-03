@@ -25,6 +25,8 @@ from .task_contract import validate_task_file_contract
 from .workflow import normalize_role, safe_task_id, update_workflow_record, workflow_path
 
 
+RUNNER_TYPE = "claude_code"
+
 
 def startup_failure_report(message: str, role: str = "reviewer") -> str:
     summary = f"STARTUP_FAILURE: {message}"
@@ -180,6 +182,7 @@ def complete_dry_run(paths: DelegateArtifactPaths, status: dict[str, Any], confi
             "sawResultSuccess": True,
             "capturedFinalResult": True,
             "dryRun": True,
+            "runnerType": RUNNER_TYPE,
         }
     ]
     status["status"] = "completed"
@@ -229,6 +232,7 @@ def complete_startup_failure(
                     "sawAssistantText": False,
                     "sawResultSuccess": False,
                     "capturedFinalResult": True,
+                    "runnerType": RUNNER_TYPE,
                 }
             ],
         }
@@ -312,6 +316,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "workflowId": workflow_id,
         "taskId": task_id,
         "role": role,
+        "runnerType": RUNNER_TYPE,
         "repoRoot": str(root),
         "workflowRoot": str(workflow_root()),
         "workflowRelativePath": rel,
@@ -355,6 +360,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
         "workflowId": workflow_id,
         "taskId": task_id,
         "role": role,
+        "runnerType": RUNNER_TYPE,
         "status": "starting",
         "pid": os.getpid(),
         "artifactRoot": str(artifact_root),
@@ -507,6 +513,7 @@ def run_delegate(ns: argparse.Namespace) -> int:
                     "outputWasNormalized": False,
                     "sawStaleSessionText": False,
                     "sawStreamJsonVerboseError": False,
+                    "runnerType": RUNNER_TYPE,
                 }
                 claude_args = new_claude_cli_args(
                     ns.model,
@@ -757,6 +764,7 @@ Risks Or Follow-ups
                 str(status.get("status") or "unknown"),
                 safe_task_id(ns.review_for_task_id) if ns.review_for_task_id else None,
                 ns.review_kind,
+                runner_type=RUNNER_TYPE,
             )
         release_session_lease(session_state_path, session_state_lock_path, key, lease, run_id, fingerprint)
         if delegate_lock is not None:

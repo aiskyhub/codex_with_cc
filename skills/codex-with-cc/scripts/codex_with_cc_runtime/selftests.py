@@ -251,7 +251,7 @@ def run_test_runtime(_: argparse.Namespace) -> int:
         if os.name == "nt":
             fake_body = '@echo off\nmore > nul\necho {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I inspected the tests."}]}}\necho {"type":"result","subtype":"success"}\nexit /b 0\n'
         else:
-            fake_body = '#!/bin/sh\necho \'{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I inspected the tests."}]}}\'\necho \'{"type":"result","subtype":"success"}\'\nexit 0\n'
+            fake_body = '#!/bin/sh\nprintf \'%s\\n\' \'{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I inspected the tests."}]}}\'\nprintf \'%s\\n\' \'{"type":"result","subtype":"success"}\'\nexit 0\n'
         fake_bin = make_fake_claude_bin(temp_root, fake_body)
         run_root = temp_root / "unstructured"
         env = {CHILD_MARKER_NAME: "1", "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -335,12 +335,12 @@ def run_test_runtime(_: argparse.Namespace) -> int:
             retry_fake_body = (
                 "#!/bin/sh\n"
                 f"if [ -f '{state_text}' ]; then\n"
-                f"  echo '{structured_record}'\n"
+                f"  printf '%s\\n' '{structured_record}'\n"
                 "else\n"
                 f"  touch '{state_text}'\n"
-                f"  echo '{unstructured_record}'\n"
+                f"  printf '%s\\n' '{unstructured_record}'\n"
                 "fi\n"
-                f"echo '{result_record}'\n"
+                f"printf '%s\\n' '{result_record}'\n"
                 "exit 0\n"
             )
         retry_fake_bin = make_fake_claude_bin(temp_root, retry_fake_body)

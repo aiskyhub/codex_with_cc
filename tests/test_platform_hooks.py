@@ -173,6 +173,30 @@ def test_pre_tool_use_allows_compliant_spawn_agent_payload() -> None:
     assert output == {}
 
 
+def test_pre_tool_use_allows_compliant_spawn_agent_payload_with_runner_description() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "spawn_agent",
+            "tool_input": {
+                "message": (
+                    "This child should verify the Claude Code runner branch, then set "
+                    "CODEX_CLAUDE_CHILD_THREAD=1 and run "
+                    "windows_scripts/delegate_to_claude.ps1 -TaskFile "
+                    ".codex/codex_with_cc/tasks/20260514/120000000-task.md "
+                    "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a "
+                    "-Scope skills/codex-with-cc"
+                ),
+                "model": "gpt-5.3-codex",
+                "reasoning_effort": "medium",
+                "fork_context": False,
+            },
+        }
+    )
+
+    assert output == {}
+
+
 def test_pre_tool_use_denies_direct_claude_shell_command() -> None:
     output = run_hook(
         {
@@ -203,6 +227,25 @@ def test_pre_tool_use_denies_delegate_shell_without_child_marker() -> None:
 
     assert "CODEX_CLAUDE_CHILD_THREAD=1" in reason
     assert "-TaskFile" in reason
+
+
+def test_pre_tool_use_denies_openai_compatible_delegate_shell_without_child_marker() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": (
+                    "pwsh -NoProfile -File windows_scripts/delegate_to_openai_report_only.ps1 "
+                    "-TaskFile .codex/codex_with_cc/tasks/20260514/120000000-task.md "
+                    "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a"
+                )
+            },
+        }
+    )
+    reason = hook_specific(output)["permissionDecisionReason"]
+
+    assert "CODEX_CLAUDE_CHILD_THREAD=1" in reason
 
 
 def test_pre_tool_use_denies_legacy_delegate_args_and_incomplete_reviewer() -> None:

@@ -12,6 +12,7 @@ repo = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo / "skills" / "codex-with-cc" / "scripts"))
 from codex_with_cc_runtime.prompts import build_prompt
 from codex_with_cc_runtime.reports import build_report_repair_prompt
+from codex_with_cc_runtime.paths import script_ext, script_family
 
 delegate = repo / "skills" / "codex-with-cc" / "scripts" / "delegate_to_claude.py"
 real_chain = repo / "skills" / "codex-with-cc" / "scripts" / "run_real_delegate_chain_validation.py"
@@ -91,11 +92,11 @@ def test_delegate_prompt_and_real_chain_contract() -> None:
         task_file = next((validation_root / "contract-check" / "tasks").rglob("*anchor-read-protocol.md"))
         task_text = task_file.read_text(encoding="utf-8")
         assert '-Scope "' in task_text
-        assert 'windows_scripts/delegate_to_claude.ps1"' in task_text
+        assert f'{script_family()}/delegate_to_claude{script_ext()}"' in task_text
         assert 'CODEX_WITH_CC.md"' in task_text
         assert "-Tests " not in task_text
         assert "Do not run verify_delegate_artifacts against this run's own live artifacts" in task_text
-        assert "verify_delegate_artifacts.ps1 -RunId <anchor-run-id>" in chain_run.stdout
+        assert f"verify_delegate_artifacts{script_ext()} -RunId <anchor-run-id>" in chain_run.stdout
 
 
 def test_final_verifier_prompt_does_not_hide_review_gate_duty() -> None:
