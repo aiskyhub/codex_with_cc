@@ -1,0 +1,6 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:9099",
+    "ANTHROPIC_AUTH_TOKEN": "sk-REPLACE_WITH_YOUR_TOKEN"
+  }
+}
