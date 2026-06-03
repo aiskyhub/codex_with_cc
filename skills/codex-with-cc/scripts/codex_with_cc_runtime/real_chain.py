@@ -96,7 +96,7 @@ def run_real_chain_validation(ns: argparse.Namespace) -> int:
 - SessionKey: {session_key}
 - ArtifactRoot: {artifact_root}
 - SessionMode: {mode}
-- Child-thread only: This task must run inside a Codex spawn_agent child thread with model 'gpt-5.3-codex', reasoning_effort 'medium', fork_context 'false'.
+- Child-thread only: This task must run inside a Codex spawn_agent child thread that inherits the main-thread model, uses reasoning_effort 'medium', and sets fork_context 'false'.
 - Required child-thread marker: set process environment CODEX_CLAUDE_CHILD_THREAD=1 before invoking the worker entry script.
 - Worker entry script: {delegate_entry}
 - Required worker arguments: {required_args}
@@ -137,7 +137,7 @@ Session Key: {session_key}
 Required Codex orchestration rules:
 - The Codex main thread may only create spawn_agent child threads and collect results.
 - Every Claude worker must run inside a child thread with:
-  - model: gpt-5.3-codex
+  - model: inherit from the current main thread
   - reasoning_effort: medium
   - fork_context: false
 - Every child thread must set CODEX_CLAUDE_CHILD_THREAD=1 and then call {delegate_entry} with -TaskFile.

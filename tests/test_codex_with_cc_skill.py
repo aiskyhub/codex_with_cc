@@ -89,7 +89,7 @@ def test_codex_with_cc_skill_contract() -> None:
         "TaskId",
         "Role",
         "current working directory",
-        "gpt-5.3-codex",
+        "inherit the main-thread model",
         "fork_context: false",
         "Status",
         "Role",

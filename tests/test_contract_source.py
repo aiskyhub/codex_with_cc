@@ -97,7 +97,8 @@ def test_contract_json_is_single_source_for_runtime_constants() -> None:
     assert contract["reportHeadings"] == list(REPORT_HEADINGS)
     assert contract["childThread"]["markerName"] == "CODEX_CLAUDE_CHILD_THREAD"
     assert contract["childThread"]["markerValue"] == "1"
-    assert contract["spawn"]["model"] == "gpt-5.3-codex"
+    assert contract["spawn"]["model"] == ""
+    assert contract["spawn"]["modelPolicy"] == "inherit_parent"
     assert contract["spawn"]["reasoningEffort"] == "medium"
     assert contract["spawn"]["forkContext"] is False
     assert "delegateEntrypointPatterns" in contract
@@ -114,6 +115,7 @@ def test_hook_gate_reads_spawn_requirements_from_contract_json() -> None:
         (workflow_root / "SKILL.md").write_text("# codex-with-cc\n", encoding="utf-8")
         (workflow_root / "CODEX_WITH_CC.md").write_text("# Codex with CC\n", encoding="utf-8")
         contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        contract["spawn"]["modelPolicy"] = "fixed"
         contract["spawn"]["model"] = "contract-model"
         (workflow_root / "contract.json").write_text(json.dumps(contract), encoding="utf-8")
 
@@ -126,7 +128,7 @@ def test_hook_gate_reads_spawn_requirements_from_contract_json() -> None:
                         "Set CODEX_CLAUDE_CHILD_THREAD=1 and run delegate_to_claude.ps1 "
                         "-TaskFile task.md -WorkflowId wf -TaskId task -Role researcher -SessionKey wf"
                     ),
-                    "model": "gpt-5.3-codex",
+                    "model": "gpt-5.4",
                     "reasoning_effort": "medium",
                     "fork_context": False,
                 },

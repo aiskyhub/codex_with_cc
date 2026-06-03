@@ -98,7 +98,7 @@ def test_pre_tool_use_denies_non_compliant_spawn_agent_payload() -> None:
 
     assert specific["hookEventName"] == "PreToolUse"
     assert specific["permissionDecision"] == "deny"
-    assert "gpt-5.3-codex" in reason
+    assert "inherit from the main thread" in reason
     assert "delegate_to_claude" in reason
     assert "fork_context: false" in reason
 
@@ -119,7 +119,7 @@ def test_pre_tool_use_denies_namespaced_spawn_agent_payload() -> None:
     reason = hook_specific(output)["permissionDecisionReason"]
 
     assert "blocked functions.spawn_agent" in reason
-    assert "gpt-5.3-codex" in reason
+    assert "inherit from the main thread" in reason
     assert "delegate_to_claude" in reason
 
 
@@ -146,7 +146,7 @@ def test_pre_tool_use_denies_spawn_agent_inside_parallel_wrapper() -> None:
     reason = hook_specific(output)["permissionDecisionReason"]
 
     assert "blocked nested functions.spawn_agent" in reason
-    assert "gpt-5.3-codex" in reason
+    assert "inherit from the main thread" in reason
     assert "delegate_to_claude" in reason
 
 
@@ -163,7 +163,6 @@ def test_pre_tool_use_allows_compliant_spawn_agent_payload() -> None:
                     "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a "
                     "-Scope skills/codex-with-cc"
                 ),
-                "model": "gpt-5.3-codex",
                 "reasoning_effort": "medium",
                 "fork_context": False,
             },
@@ -187,7 +186,6 @@ def test_pre_tool_use_allows_compliant_spawn_agent_payload_with_runner_descripti
                     "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a "
                     "-Scope skills/codex-with-cc"
                 ),
-                "model": "gpt-5.3-codex",
                 "reasoning_effort": "medium",
                 "fork_context": False,
             },
@@ -208,6 +206,18 @@ def test_pre_tool_use_denies_direct_claude_shell_command() -> None:
     reason = hook_specific(output)["permissionDecisionReason"]
 
     assert "direct Claude CLI" in reason
+
+
+def test_pre_tool_use_allows_read_only_search_that_mentions_delegate_name() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": 'rg -n "delegate_to_claude" README.md'},
+        }
+    )
+
+    assert output == {}
 
 
 def test_pre_tool_use_denies_delegate_shell_without_child_marker() -> None:

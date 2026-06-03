@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const FALLBACK_CONTRACT = {
   childThread: { markerName: "CODEX_CLAUDE_CHILD_THREAD", markerValue: "1" },
-  spawn: { model: "gpt-5.3-codex", reasoningEffort: "medium", forkContext: false },
+  spawn: { model: "", modelPolicy: "inherit_parent", reasoningEffort: "medium", forkContext: false },
   workerRoles: ["planner", "implementer", "researcher", "reviewer", "final-verifier"],
   triggerPatterns: [
     "child[- ]?agent",
@@ -32,7 +32,7 @@ const FALLBACK_CONTEXT = [
   "- Do not use the default Codex subagent flow, a host-provided worker shortcut, direct claude execution, or direct main-thread delegate_to_claude.* execution.",
   "- Use the staged flow: plan task graph, dispatch bounded tasks, execute with scoped worker context, review spec compliance, review quality, then verify the workflow.",
   "- Implementer workflows require spec review, quality review, and final-verifier acceptance.",
-  "- Child spawn metadata must be model: gpt-5.3-codex, reasoning_effort: medium, fork_context: false.",
+  "- Child spawn metadata must inherit the main-thread model, use reasoning_effort: medium, and set fork_context: false.",
   "- The child must set CODEX_CLAUDE_CHILD_THREAD=1 and call delegate_to_claude.* with -TaskFile, -WorkflowId, -TaskId, -Role, and -SessionKey.",
   "- Use validate_delegate_task.* to preflight generated TaskFiles when review metadata or -Tests are involved.",
   "- Legacy inline -Task and -Mode delegate arguments are forbidden.",
@@ -87,6 +87,7 @@ function readContract() {
 
 const CONTRACT = readContract();
 const REQUIRED_MODEL = CONTRACT.spawn.model;
+const REQUIRED_MODEL_POLICY = CONTRACT.spawn.modelPolicy || (REQUIRED_MODEL ? "fixed" : "inherit_parent");
 const REQUIRED_EFFORT = CONTRACT.spawn.reasoningEffort;
 const REQUIRED_FORK_CONTEXT = CONTRACT.spawn.forkContext;
 const CHILD_MARKER_NAME = CONTRACT.childThread.markerName;
@@ -160,6 +161,10 @@ function getToolName(input) {
 
 function getToolInput(input) {
   return input.tool_input || input.toolInput || {};
+}
+
+function getShellCommand(toolInput) {
+  return prop(toolInput, "command", "command") || "";
 }
 
 function getPrompt(input) {
@@ -258,6 +263,10 @@ function hasDelegateEntrypoint(serialized) {
   return DELEGATE_ENTRYPOINT_PATTERNS.some((pattern) => pattern.test(serialized));
 }
 
+function isReadOnlyInspectionCommand(serialized) {
+  return /^\s*(?:rg|grep|findstr|select-string|get-content|cat|type|git\s+show|git\s+grep)\b/i.test(serialized);
+}
+
 function hasTaskFile(serialized) {
   return /(?:^|[\s"'])(?:-TaskFile|--task-file)\b/i.test(serialized);
 }
@@ -315,12 +324,28 @@ function hasDirectClaudeCommand(serialized) {
   return /(?:^|[\n\r;&|`"'])\s*(?:\.\/|\.\\|[\w:/\\.-]*[/\\])?claude(?:\.cmd|\.exe)?(?:\s+(?:-|--|<|>|2>|&>|;|\||&&|\|\|)|\s*$|$)/i.test(serialized);
 }
 
+function hasExplicitModel(payload) {
+  const value = prop(payload, "model", "model");
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
+function modelRequirementReason() {
+  if (REQUIRED_MODEL_POLICY === "inherit_parent") {
+    return "model must inherit from the main thread; omit explicit model override";
+  }
+  return `model must be ${REQUIRED_MODEL}`;
+}
+
 function validateWorkflowPayload(payload) {
   const serialized = stringify(payload);
   const problems = [];
 
-  if (prop(payload, "model", "model") !== REQUIRED_MODEL) {
-    problems.push(`model must be ${REQUIRED_MODEL}`);
+  if (REQUIRED_MODEL_POLICY === "inherit_parent") {
+    if (hasExplicitModel(payload)) {
+      problems.push(modelRequirementReason());
+    }
+  } else if (prop(payload, "model", "model") !== REQUIRED_MODEL) {
+    problems.push(modelRequirementReason());
   }
   if (prop(payload, "reasoning_effort", "reasoningEffort") !== REQUIRED_EFFORT) {
     problems.push(`reasoning_effort must be ${REQUIRED_EFFORT}`);
@@ -398,12 +423,13 @@ function handlePreToolUse(input) {
 
   if (isShellToolName(normalizedToolName)) {
     const problems = [];
+    const shellCommand = String(getShellCommand(toolInput) || "");
 
     if (hasDirectClaudeCommand(serialized)) {
       problems.push("direct Claude CLI execution is forbidden");
     }
 
-    if (hasDelegateEntrypoint(serialized)) {
+    if (hasDelegateEntrypoint(serialized) && !isReadOnlyInspectionCommand(shellCommand)) {
       if (!hasChildMarker(serialized)) {
         problems.push("CODEX_CLAUDE_CHILD_THREAD=1 is required");
       }
