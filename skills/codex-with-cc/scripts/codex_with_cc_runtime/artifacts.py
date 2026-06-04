@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .common import ARTIFACT_SCHEMA_VERSION, CHILD_MARKER_NAME, INVOCATION_CONTRACT, REPORT_STATUS_VALUES, WORKER_ROLES, DelegateError, boolish, same_path
-from .io_utils import load_json
+from .io_utils import load_json, write_json
 from .paths import project_artifact_root, user_artifact_root
 from .reports import parse_report_final_result, parse_report_role, parse_report_status, path_has_required_report_headings, report_section
 from .workflow import REQUIRED_IMPLEMENTER_REVIEWS, workflow_path
@@ -56,6 +56,10 @@ def verify_artifacts(run_id: str, artifact_root_value: str | None) -> dict[str, 
         raise DelegateError(f"Config outputPath mismatch. Expected: {output_path} ; Actual: {config.get('outputPath')}")
     if not same_path(str(status.get("outputPath")), output_path):
         raise DelegateError(f"Status outputPath mismatch. Expected: {output_path} ; Actual: {status.get('outputPath')}")
+    if str(status.get("status")) in ("starting", "running") and path_has_required_report_headings(output_path):
+        status["status"] = "completed"
+        status["statusRecoveredFromReport"] = True
+        write_json(status_path, status)
     status_value = str(status.get("status"))
     if status_value not in ("starting", "running", "completed", "failed"):
         raise DelegateError(f"Unexpected delegate status value: {status_value}")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import json
+import subprocess
 
 
 def test_plugin_manifest_and_docs_contract() -> None:
@@ -18,7 +19,7 @@ def test_plugin_manifest_and_docs_contract() -> None:
 
     codex_plugin = json.loads(codex_plugin_path.read_text(encoding="utf-8"))
     assert codex_plugin["name"] == "codex-with-cc"
-    assert codex_plugin["version"] == "1.0.8"
+    assert codex_plugin["version"] == "1.0.9"
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["hooks"] == "./hooks/hooks.json"
     assert (repo / "hooks" / "hooks.json").exists()
@@ -43,3 +44,20 @@ def test_plugin_manifest_and_docs_contract() -> None:
     assert "不是仓库主身份" not in ai_install_text
     assert legacy_scope_phrase not in ai_install_text
     assert "当前仓库只提供 Codex 插件入口，不提供 Claude 宿主插件配置。" in ai_install_text
+
+
+def test_macos_scripts_keep_executable_git_mode() -> None:
+    repo = Path(__file__).resolve().parents[1]
+    scripts = sorted((repo / "skills" / "codex-with-cc" / "macos_scripts").glob("*.sh"))
+    assert scripts
+
+    for script in scripts:
+        rel = script.relative_to(repo).as_posix()
+        result = subprocess.run(
+            ["git", "ls-tree", "HEAD", rel],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        assert result.stdout.startswith("100755 "), result.stdout

@@ -332,6 +332,32 @@ def test_delegate_does_not_pass_removed_claude_name_option() -> None:
         assert verified.returncode == 0, verified.stdout + verified.stderr
 
 
+def test_verify_artifacts_repairs_stale_running_status_from_structured_report() -> None:
+    with tempfile.TemporaryDirectory(prefix="codex_with_cc_stale_status_repair_") as tmp:
+        root = Path(tmp)
+        artifact_root = root / "artifacts"
+        fake_bin = make_fake_claude_bin(root)
+        result = run_delegate(
+            "stale status repair",
+            ["-BypassPermissions", "-MaxRetryCount", "0"],
+            artifact_root,
+            {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"},
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        run_id = run_id_from_output(result.stdout)
+        status_path = artifact_root / f"status_{run_id}.json"
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        status["status"] = "running"
+        status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        verified = verify_artifacts(run_id, artifact_root)
+
+        assert verified.returncode == 0, verified.stdout + verified.stderr
+        repaired_status = json.loads(status_path.read_text(encoding="utf-8"))
+        assert repaired_status["status"] == "completed"
+        assert repaired_status["statusRecoveredFromReport"] is True
+
+
 def test_dry_run_writes_complete_verifiable_artifacts() -> None:
     with tempfile.TemporaryDirectory(prefix="codex_with_cc_dry_run_artifacts_") as tmp:
         artifact_root = Path(tmp) / "artifacts"

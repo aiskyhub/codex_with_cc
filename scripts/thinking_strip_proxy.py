@@ -66,11 +66,13 @@ def strip_thinking(value: Any) -> Any:
     return value
 
 
-def inject_cached_thinking(payload: Any, cache: dict[str, list[dict[str, Any]]]) -> Any:
+def inject_cached_thinking(payload: Any, cache: dict[str, list[dict[str, Any]]], *, enabled: bool = True) -> Any:
     """Strip client-visible thinking while reinjecting cached blocks for upstream."""
     if not isinstance(payload, dict):
         return strip_thinking(payload)
     clean = strip_thinking(payload)
+    if not enabled:
+        return clean
     if not isinstance(clean, dict):
         return clean
     messages = clean.get("messages")
@@ -141,6 +143,13 @@ def should_stream(headers: dict[str, str], body: bytes) -> bool:
     return bool(isinstance(payload, dict) and payload.get("stream"))
 
 
+def is_thinking_rejection(status: int, body: bytes) -> bool:
+    if status not in {400, 422}:
+        return False
+    text = body.decode("utf-8", errors="ignore").lower()
+    return "thinking" in text or "tinking" in text
+
+
 class ThinkingStripHandler(BaseHTTPRequestHandler):
     server_version = "thinking-strip-proxy/0.1"
     protocol_version = "HTTP/1.1"
@@ -178,16 +187,19 @@ class ThinkingStripHandler(BaseHTTPRequestHandler):
             (parsed.scheme, parsed.netloc, path, incoming.query, incoming.fragment)
         )
 
-    def _request_body(self) -> bytes:
+    def _request_body(self, *, inject_cached: bool = True) -> bytes:
         length = int(self.headers.get("content-length") or "0")
         body = self.rfile.read(length) if length else b""
+        return self._transform_json_body(body, inject_cached=inject_cached)
+
+    def _transform_json_body(self, body: bytes, *, inject_cached: bool = True) -> bytes:
         if "application/json" not in self.headers.get("content-type", "").lower():
             return body
         try:
             payload = json.loads(body.decode("utf-8")) if body else {}
         except json.JSONDecodeError:
             return body
-        payload = inject_cached_thinking(payload, self.server.thinking_by_tool_use)
+        payload = inject_cached_thinking(payload, self.server.thinking_by_tool_use, enabled=inject_cached)
         return json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
     def _forward_headers(self, body: bytes) -> dict[str, str]:
@@ -229,7 +241,31 @@ class ThinkingStripHandler(BaseHTTPRequestHandler):
                         upstream.read(),
                     )
         except urllib.error.HTTPError as exc:
-            self._send_response(exc.code, dict(exc.headers.items()), exc.read())
+            error_body = exc.read()
+            if self.server.thinking_by_tool_use and is_thinking_rejection(exc.code, error_body):
+                self.server.thinking_by_tool_use.clear()
+                body = self._transform_json_body(body, inject_cached=False)
+                headers = self._forward_headers(body)
+                req = urllib.request.Request(
+                    self._upstream_url(),
+                    data=body if self.command not in {"GET", "HEAD"} else None,
+                    headers=headers,
+                    method=self.command,
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=self.server.timeout_seconds) as upstream:
+                        if should_stream(dict(upstream.headers.items()), body):
+                            self._send_stream(upstream)
+                        else:
+                            self._send_response(
+                                upstream.status,
+                                dict(upstream.headers.items()),
+                                upstream.read(),
+                            )
+                except urllib.error.HTTPError as retry_exc:
+                    self._send_response(retry_exc.code, dict(retry_exc.headers.items()), retry_exc.read())
+                return
+            self._send_response(exc.code, dict(exc.headers.items()), error_body)
         except Exception as exc:  # pragma: no cover - defensive runtime guard
             self._send_json(502, {"error": "proxy_upstream_error", "detail": str(exc)})
 
