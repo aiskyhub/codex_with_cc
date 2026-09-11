@@ -47,6 +47,10 @@ Codex 主线程 -> Codex spawn_agent 子线程 -> 已安装插件中的 delegate
 
 插件声明 `./hooks/hooks.json`。宿主启用 Codex hooks 后，`SessionStart` 注入完整契约，`UserPromptSubmit` 遇到触发词时再次注入，`PreToolUse` 拦截直接 `claude`、主线程直接 `delegate_to_claude.*`、缺少 `CODEX_CLAUDE_CHILD_THREAD=1`、缺少 `-TaskFile`、缺少 workflow metadata、缺少 `-SessionKey`、旧式 `-Task`、旧式 `-Mode`、reviewer 缺少 review metadata、以及并行写任务无 `-Scope`。
 
+Codex 当前的 `spawn_agent` schema 使用 `fork_turns: "none"` 表示不继承父线程上下文；旧宿主使用的 `fork_context: false` 具有相同语义。hook 会把这两个字段规范化，等价组合可以通过，冲突组合会拒绝。hook 只相信宿主传入的可见 `tool_input`；如果任务消息或 workflow 元数据是 opaque/encrypted、无法在 payload 中核验，默认拒绝，不通过关闭校验来绕过。
+
+当前工作流的 Codex 子线程模型策略是 `inherit_parent`：`spawn_agent` 不支持切换到不同的 Codex 模型，显式 `model` 会被拒绝。任务级的 Claude worker 模型仍可通过 delegate runner 的 `-Model` 选择；report runner 使用其 `-Model` 或文档列出的环境变量配置。
+
 ## 分发源
 
 唯一分发入口：
@@ -83,7 +87,12 @@ Plugin name: codex-with-cc@aiskyhub
 
 当前仓库只提供 Codex 插件入口，不提供 Claude 宿主插件配置。
 
-Codex 当前 CLI 没有 `marketplace list` 子命令，因此“是否已添加 marketplace”必须通过读取 `~/.codex/config.toml` 判定。
+优先使用 Codex CLI 检查 marketplace 和插件状态；必要时再读取 `~/.codex/config.toml` 核对持久化配置：
+
+```bash
+codex plugin marketplace list
+codex plugin list --marketplace aiskyhub
+```
 
 ### 1. 检查并安装 Codex CLI
 
@@ -141,7 +150,24 @@ codex plugin marketplace add aiskyhub/aiskyhub
 
 安装后如未即时生效，可提示用户重载插件或重启 Codex。
 
-### 4. 启用 Codex hooks 半硬门
+### 4. 更新已安装插件
+
+Codex CLI 的受支持更新路径是先刷新 marketplace，再从新快照重新安装插件：
+
+```bash
+codex plugin marketplace upgrade aiskyhub
+codex plugin add codex-with-cc@aiskyhub
+```
+
+在交互界面中，先在 `/plugin` 中刷新 `aiskyhub`，再重新执行：
+
+```text
+/plugin install codex-with-cc@aiskyhub --scope user
+```
+
+更新完成后重启 Codex 或重新打开任务，让新 hook 和 skill 生效。不要只执行 marketplace add；它不会刷新已注册的远程快照。
+
+### 5. 启用 Codex hooks 半硬门
 
 如果目标 Codex 宿主支持 hooks，确认用户配置启用了：
 
@@ -152,7 +178,7 @@ codex_hooks = true
 
 没有启用 hooks 时，插件仍会通过 `$codex-with-cc` skill 做工作流约束；启用后会额外获得平台级 `SessionStart`、`UserPromptSubmit` 和 `PreToolUse` 拦截层。
 
-### 5. 定位已安装 workflow 根目录
+### 6. 定位已安装 workflow 根目录
 
 后续委派命令里的 `<installed-workflow-root>` 指已安装插件包内部的 `skills/codex-with-cc` 目录，例如：
 
@@ -162,7 +188,7 @@ codex_hooks = true
 
 不要把 `<version-or-hash>` 包根目录当成 workflow 根目录；`contract.json`、`scripts`、`windows_scripts` 和 `macos_scripts` 都在 `skills/codex-with-cc` 下面。
 
-### 6. 安装后自检
+### 7. 安装后自检
 
 如果已经能定位 `<installed-workflow-root>`，优先执行插件自带自检。自检失败时直接报告失败，不回退到复制文件或旧安装脚本。
 

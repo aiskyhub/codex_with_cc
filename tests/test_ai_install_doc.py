@@ -20,6 +20,8 @@ def test_ai_install_doc_contract() -> None:
     assert "安装完成后再次确认 `codex` 命令可用，再继续 marketplace 安装流程。" in text
     assert "如果 `npm` 不存在、CLI 安装失败、或安装后仍然无法调用 `codex`，直接报告失败并停止，不要跳过这一步继续执行。" in text
     assert "codex plugin marketplace add aiskyhub/aiskyhub" in text
+    assert "codex plugin marketplace upgrade aiskyhub" in text
+    assert "codex plugin add codex-with-cc@aiskyhub" in text
     assert "codex-with-cc@aiskyhub" in text
     assert "--scope user" in text
     assert "$codex-with-cc" in text

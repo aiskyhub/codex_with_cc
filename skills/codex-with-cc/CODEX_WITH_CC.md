@@ -9,7 +9,7 @@ Read this file before using the workflow in this repository. Treat `contract.jso
 1. Any child-agent, subagent, sub-agent, child-thread, subthread, delegation, worker-execution, 子代理, 子线程, 多代理, 委派, 派工, or 执行层 request must use this workflow.
 2. Do not replace it with the default Codex subagent flow, host worker shortcuts, direct `claude`, or direct main-thread `delegate_to_claude.*`.
 3. The Codex main thread owns design, task boundaries, acceptance criteria, review decisions, rework decisions, and final delivery.
-4. Every Claude Code worker run must be carried by a fresh Codex `spawn_agent` child thread that inherits the main-thread model, uses `reasoning_effort: medium`, and sets `fork_context: false`.
+4. Every Claude Code worker run must be carried by a fresh Codex `spawn_agent` child thread that inherits the main-thread model, uses `reasoning_effort: medium`, and sets `fork_turns: "none"` on current hosts (`fork_context: false` remains supported on legacy hosts).
 5. The child thread must set `CODEX_CLAUDE_CHILD_THREAD=1` before invoking `delegate_to_claude.*`.
 6. Delegate commands must use task-file-only invocation. `-TaskFile`, `-WorkflowId`, `-TaskId`, `-Role`, and `-SessionKey` are required.
 7. Legacy inline `-Task`, legacy `-Mode`, missing workflow metadata, and implicit session-key fallback are not supported.
@@ -81,6 +81,7 @@ The Codex plugin declares `./hooks/hooks.json` as a semi-hard platform gate. Whe
 - `SessionStart` injects this full contract.
 - `UserPromptSubmit` reinforces the contract for delegation trigger words.
 - `PreToolUse` denies visible direct `claude`, direct main-thread `delegate_to_claude.*`, missing `CODEX_CLAUDE_CHILD_THREAD=1`, missing `-TaskFile`, missing workflow metadata, missing `-SessionKey`, legacy `-Task`, legacy `-Mode`, reviewer runs without review metadata, and parallel writable runs without `-Scope`.
+- For the spawn context control, current Codex hosts use `fork_turns: "none"`; legacy hosts use `fork_context: false`. The hook normalizes these equivalent forms, rejects conflicting aliases, and keeps rejecting opaque payloads whose visible message cannot prove the worker metadata.
 
 The hook reads `contract.json` for shared tokens. This is not a kernel boundary; final responsibility remains with the Codex main thread.
 
@@ -159,6 +160,8 @@ Delegation artifacts are written under `.codex/codex_with_cc/claude-delegate` by
 Use `verify_delegate_run.*` or `verify_delegate_artifacts.*` for each run, `verify_delegate_workflow.*` for the workflow aggregate, and `verify_delegate_chain.*` for multi-run session continuity checks. `verify_delegate_workflow.*` enforces review gates, the final-verifier gate, declared `-Tests` evidence for non-dry-run `DONE` reports, and non-overlapping parallel implementer scopes. The shared implementation lives under `scripts/*.py`; platform wrappers stay thin.
 
 `<installed-workflow-root>` means the installed `skills/codex-with-cc` directory, for example `<codex-home>/plugins/cache/aiskyhub/codex-with-cc/<version-or-hash>/skills/codex-with-cc`. Do not use the package root `<version-or-hash>` directory.
+
+The Codex child model is inherited from the parent by contract; an explicit `spawn_agent.model` override is rejected. Per-task worker model selection is separate: pass `-Model` to `delegate_to_claude.*`, or configure the OpenAI-compatible report runner with its documented model option/environment variable.
 
 ## Standard Worker Command
 Normally run this inside a Codex child thread. If the Codex sandbox or delegated runner cannot execute it, use the trusted local terminal fallback above.

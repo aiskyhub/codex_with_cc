@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const FALLBACK_CONTRACT = {
   childThread: { markerName: "CODEX_CLAUDE_CHILD_THREAD", markerValue: "1" },
-  spawn: { model: "", modelPolicy: "inherit_parent", reasoningEffort: "medium", forkContext: false },
+  spawn: { model: "", modelPolicy: "inherit_parent", reasoningEffort: "medium", forkContext: false, forkTurns: "none" },
   workerRoles: ["planner", "implementer", "researcher", "reviewer", "final-verifier"],
   triggerPatterns: [
     "child[- ]?agent",
@@ -32,7 +32,7 @@ const FALLBACK_CONTEXT = [
   "- Do not use the default Codex subagent flow, a host-provided worker shortcut, direct claude execution, or direct main-thread delegate_to_claude.* execution.",
   "- Use the staged flow: plan task graph, dispatch bounded tasks, execute with scoped worker context, review spec compliance, review quality, then verify the workflow.",
   "- Implementer workflows require spec review, quality review, and final-verifier acceptance.",
-  "- Child spawn metadata must inherit the main-thread model, use reasoning_effort: medium, and set fork_context: false.",
+  "- Child spawn metadata must inherit the main-thread model, use reasoning_effort: medium, and set fork_turns: \"none\" (legacy hosts may use fork_context: false).",
   "- The child must set CODEX_CLAUDE_CHILD_THREAD=1 and call delegate_to_claude.* with -TaskFile, -WorkflowId, -TaskId, -Role, and -SessionKey.",
   "- Use validate_delegate_task.* to preflight generated TaskFiles when review metadata or -Tests are involved.",
   "- Legacy inline -Task and -Mode delegate arguments are forbidden.",
@@ -220,6 +220,77 @@ function isFalse(value) {
   return value === false || value === "false";
 }
 
+function isTrue(value) {
+  return value === true || value === "true";
+}
+
+function aliasEntries(input, names) {
+  return names
+    .filter((name) => input && Object.prototype.hasOwnProperty.call(input, name))
+    .map((name) => ({ name, value: input[name] }));
+}
+
+function normalizeForkContextValue(value) {
+  if (isFalse(value)) {
+    return false;
+  }
+  if (isTrue(value)) {
+    return true;
+  }
+  return undefined;
+}
+
+function normalizeForkTurnsValue(value) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "none") {
+    return false;
+  }
+  if (normalized === "all" || /^[1-9]\d*$/.test(normalized)) {
+    return true;
+  }
+  return undefined;
+}
+
+function forkContextProblems(payload) {
+  const values = [];
+  const problems = [];
+  const contextEntries = aliasEntries(payload, ["fork_context", "forkContext"]);
+  const turnEntries = aliasEntries(payload, ["fork_turns", "forkTurns"]);
+
+  for (const entry of contextEntries) {
+    const normalized = normalizeForkContextValue(entry.value);
+    if (normalized === undefined) {
+      problems.push(`${entry.name} must be a boolean`);
+      continue;
+    }
+    values.push({ name: entry.name, value: normalized });
+  }
+
+  for (const entry of turnEntries) {
+    const normalized = normalizeForkTurnsValue(entry.value);
+    if (normalized === undefined) {
+      problems.push(`${entry.name} must be \"none\", \"all\", or a positive integer string`);
+      continue;
+    }
+    values.push({ name: entry.name, value: normalized });
+  }
+
+  if (new Set(values.map((entry) => entry.value)).size > 1) {
+    problems.push("fork_context and fork_turns aliases must describe the same context mode");
+  }
+
+  const normalizedRequired = normalizeForkContextValue(REQUIRED_FORK_CONTEXT);
+  if (values.length === 0 || values[0].value !== normalizedRequired) {
+    problems.push('fork_context: false or fork_turns: "none" is required');
+  }
+
+  return problems;
+}
+
 function toolNameTail(toolName) {
   const parts = String(toolName || "").toLowerCase().split(/[.:/\\]/).filter(Boolean);
   return parts.length > 0 ? parts[parts.length - 1] : "";
@@ -350,9 +421,7 @@ function validateWorkflowPayload(payload) {
   if (prop(payload, "reasoning_effort", "reasoningEffort") !== REQUIRED_EFFORT) {
     problems.push(`reasoning_effort must be ${REQUIRED_EFFORT}`);
   }
-  if (prop(payload, "fork_context", "forkContext") !== REQUIRED_FORK_CONTEXT) {
-    problems.push("fork_context: false is required");
-  }
+  problems.push(...forkContextProblems(payload));
   if (hasDirectClaudeCommand(serialized)) {
     problems.push("direct Claude CLI execution is forbidden");
   }

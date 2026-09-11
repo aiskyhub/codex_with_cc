@@ -10,7 +10,8 @@
     "model": "",
     "modelPolicy": "inherit_parent",
     "reasoningEffort": "medium",
-    "forkContext": false
+    "forkContext": false,
+    "forkTurns": "none"
   },
   "workerRoles": [
     "planner",

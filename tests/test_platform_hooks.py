@@ -195,6 +195,89 @@ def test_pre_tool_use_allows_compliant_spawn_agent_payload_with_runner_descripti
     assert output == {}
 
 
+def test_pre_tool_use_allows_current_spawn_agent_fork_turns_schema() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "spawn_agent",
+            "tool_input": {
+                "message": (
+                    "Set CODEX_CLAUDE_CHILD_THREAD=1, then run "
+                    "windows_scripts/delegate_to_claude.ps1 -TaskFile "
+                    ".codex/codex_with_cc/tasks/20260514/120000000-task.md "
+                    "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a "
+                    "-Scope skills/codex-with-cc"
+                ),
+                "reasoning_effort": "medium",
+                "fork_turns": "none",
+            },
+        }
+    )
+
+    assert output == {}
+
+
+def test_pre_tool_use_allows_equivalent_fork_context_aliases() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "spawn_agent",
+            "tool_input": {
+                "message": (
+                    "Set CODEX_CLAUDE_CHILD_THREAD=1, then run "
+                    "windows_scripts/delegate_to_claude.ps1 -TaskFile task.md "
+                    "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a"
+                ),
+                "reasoning_effort": "medium",
+                "fork_context": False,
+                "fork_turns": "none",
+            },
+        }
+    )
+
+    assert output == {}
+
+
+def test_pre_tool_use_denies_conflicting_fork_context_aliases() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "spawn_agent",
+            "tool_input": {
+                "message": (
+                    "Set CODEX_CLAUDE_CHILD_THREAD=1, then run "
+                    "windows_scripts/delegate_to_claude.ps1 -TaskFile task.md "
+                    "-WorkflowId wf-a -TaskId task-a -Role researcher -SessionKey wf-a"
+                ),
+                "reasoning_effort": "medium",
+                "fork_context": False,
+                "fork_turns": "all",
+            },
+        }
+    )
+    reason = hook_specific(output)["permissionDecisionReason"]
+
+    assert "same context mode" in reason
+
+
+def test_pre_tool_use_keeps_opaque_current_schema_payloads_denied() -> None:
+    output = run_hook(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "spawn_agent",
+            "tool_input": {
+                "message": "opaque task payload",
+                "reasoning_effort": "medium",
+                "fork_turns": "none",
+            },
+        }
+    )
+    reason = hook_specific(output)["permissionDecisionReason"]
+
+    assert "CODEX_CLAUDE_CHILD_THREAD=1 is required" in reason
+    assert "-TaskFile is required" in reason
+
+
 def test_pre_tool_use_denies_direct_claude_shell_command() -> None:
     output = run_hook(
         {
